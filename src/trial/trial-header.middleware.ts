@@ -27,15 +27,11 @@ export class TrialHeaderMiddleware implements NestMiddleware {
                 'Заголовок line-number должен быть корректным числом',
             );
         }
-
-        const isValid = await this.trialService.validateLineTrial(lineNumber);
-
-        if (!isValid) {
-            throw new ForbiddenException(
-                `Триал-период для линии №${lineNumber} недействителен или истёк`,
-            );
+        try {
+            await this.trialService.validateLineTrial(lineNumber);
+        }catch (error) {
+            throw new BadRequestException()
         }
-
         next();
     }
 }

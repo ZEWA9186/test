@@ -1,19 +1,16 @@
-import {Column, Entity, PrimaryGeneratedColumn} from "typeorm";
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
 export class TrialEntity {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({type: 'int' ,unique: true })
+    @Column({ type: 'int', unique: true, nullable: false })
     lineNumber: number;
 
-    @Column({ type: 'timestamp'})
-    startDate: Date;
-
-    @Column({ type: 'timestamp'})
-    endDate: Date;
-
-    @Column({ type: 'boolean' , nullable: false })
+    @Column({ type: 'int', default: 86400 })
+    remainingMinutes: number;
+    
+    @Column({ type: 'boolean', nullable: false, default: true })
     isTrial: boolean;
 }
