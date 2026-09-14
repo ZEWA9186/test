@@ -17,6 +17,8 @@ export class CodeService {
     ) {}
 
     async validateAndSaveCode(code: string) {
+        const startTime = performance.now();
+
         if (!code) {
             throw new BadRequestException('Код не может быть пустым');
         }
@@ -24,6 +26,8 @@ export class CodeService {
         try {
             await this.codeRepository.insert({ code });
             codeLogger.info(`Код ${code} успешно сохранён`);
+
+            console.log("Время: ", performance.now() - startTime);
 
             return { message: 'Код успешно сохранён' };
 
@@ -62,6 +66,25 @@ export class CodeService {
 
             codeLogger.error(`Ошибка при сохранении кодов: ${error?.message || error}`);
             throw new InternalServerErrorException('Ошибка при сохранении кодов');
+        }
+    }
+
+    async getCodes(codes: string[]) {
+        const data = await this.codeRepository.query(
+            'SELECT code FROM "code_entity" WHERE code = ANY($1)',
+            codes
+        )
+        return data.map((el : any) => el.code);
+    }
+
+    async deleteCode(code: string) {
+        try {
+            await this.codeRepository.delete({code});
+            codeLogger.info('Удаление кода');
+            return { message: 'Код успешно удалён' };
+        } catch (error : any) {
+            codeLogger.error(error.message || error);
+            throw new InternalServerErrorException();
         }
     }
 }

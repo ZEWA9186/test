@@ -5,12 +5,12 @@ export class TrialEntity {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({ type: 'int', unique: true, nullable: false })
-    lineNumber: number;
+    @Column({ type: 'varchar', unique: true, nullable: false, name: 'line_ip' })
+    lineIp: string;
 
-    @Column({ type: 'int', default: 86400 })
+    @Column({ type: 'int', default: 86400, name: 'remaining_minutes' })
     remainingMinutes: number;
     
-    @Column({ type: 'boolean', nullable: false, default: true })
+    @Column({ type: 'boolean', nullable: false, default: true, name: 'is_trial' })
     isTrial: boolean;
 }
