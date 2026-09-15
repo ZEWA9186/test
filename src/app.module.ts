@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { createObserveModule } from '@nestjs/observe';
+// import { createObserveModule } from '@nestjs/observe';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -9,7 +9,7 @@ import { CodeModule } from './code/code.module'
 import {ScheduleModule} from "@nestjs/schedule";
 import {DatabaseProviders} from "./database.providers";
 
-export const { ObserveInstrument } = createObserveModule();
+// export const { ObserveInstrument } = createObserveModule();
 
 @Module({
   imports: [
