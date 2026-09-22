@@ -1,39 +1,43 @@
-import {HttpException, HttpStatus, Inject, Injectable, OnModuleInit} from '@nestjs/common';
+import {HttpException, HttpStatus, Injectable, OnModuleInit} from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getJsonDirectory1S, getTaskJsonDirectory, getLineTaskDirectory } from '../path.utils';
+
+import {logger1S} from "../logger-winston/winston.config";
+import {
+  getJsonDirectory1S,
+  getLineTaskDirectory,
+  initDirectories
+} from '../path.utils';
 import { validateJson } from './validate.json';
 import * as dotenv from 'dotenv';
-import { logger1S } from '../logger-winston/winston.config';
-import { Logger } from 'winston';
 import {CodeService} from "../code/code.service";
 
 dotenv.config();
-const interval = /*+process.env.CHECK_1S_INTERVAL*/ 60000;
+const interval = /*+process.env.CHECK_1S_INTERVAL*/ 6000;
 
 @Injectable()
-export class FileService1S implements OnModuleInit {
+export class Task1sService implements OnModuleInit {
   private files: string[] = [];
   private filesIn: string[] = [];
   private checkInterval: NodeJS.Timeout;
 
 
-  constructor(
-      @Inject('winston') private readonly logger: Logger = logger1S,
-      private readonly codeService: CodeService
-  ) {
+  constructor(private readonly codeService: CodeService) {
   }
 
-  onModuleInit() {
-    // Первая проверка сразу при старте
-    this.checkFilesInDirectory();
+  async onModuleInit() {
+    await initDirectories();
 
+    await this.checkFilesInDirectory();
+    logger1S.debug('Запуск проверки файлов от 1С...');
     // Затем проверка каждую минуту (60000 мс)
     this.checkInterval = setInterval(
         () => this.checkFilesInDirectory(),
         interval,
     );
   }
+
+
 
   async onApplicationShutdown() {
     // Очищаем интервал при остановке приложения
@@ -207,10 +211,8 @@ export class FileService1S implements OnModuleInit {
 
   async checkFilesInDirectory() {
     const directoryPath = getJsonDirectory1S();
-    const taskDirectoryPath = getTaskJsonDirectory();
     const results = [];
 
-    await fs.promises.mkdir(taskDirectoryPath, {recursive: true});
 
     const allFiles = await fs.promises.readdir(directoryPath);
     this.filesIn = allFiles.filter((file) => file.endsWith('.in'));
@@ -259,6 +261,7 @@ export class FileService1S implements OnModuleInit {
           results.push({success: false, message: `Файл ${jsonFileName} содержит ошибки валидации`});
         }
       } catch (error: any) {
+        logger1S.error(`Ошибка при обработке файла ${fileIn}: ${error.message}`, error.stack);
         results.push({success: false, message: `Ошибка обработки ${fileIn}: ${error.message}`});
       }
     }
@@ -282,8 +285,7 @@ export class FileService1S implements OnModuleInit {
       return { success: false, errors, items };
     }
 
-    const targetLines: number[] = (Array.isArray(jsonParsed.line) ? jsonParsed.line : [jsonParsed.line]).map(Number);
-    const codes: string[] = jsonParsed.codes;
+    const targetLines: number[] = (Array.isArray(jsonParsed.lines) ? jsonParsed.lines : [jsonParsed.lines]).map(Number);    const codes: string[] = jsonParsed.codes;
     const codesPerLine: number[] = (jsonParsed.codesPerLine).map(Number);
 
     const codeChunks = this.splitArrayByLineCounts(codes, codesPerLine);
@@ -298,7 +300,6 @@ export class FileService1S implements OnModuleInit {
 
       const lineTaskPayload = {
         ...restJson,
-        line: lineNum,
         codes: codeChunks[i]
       };
 

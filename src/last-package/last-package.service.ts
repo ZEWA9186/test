@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LastPackageEntity } from './last-package.entity';
+import { LastPackageEntity } from './entities/last-package.entity';
 import { Repository } from 'typeorm';
 
 @Injectable()
@@ -12,11 +12,11 @@ export class LastPackageService {
 
   async addNoteAndTook(
     gtin: string,
-    DateTask: any,
+    DateTask: string,
     BatchNumber: string,
   ): Promise<{
-    boxNumber: any;
-    palletNumber: any;
+    boxNumber: number;
+    palletNumber: number;
   }> {
     const result = await this.lastPackageEntityRepository.findOne({
       where: { gtin, DateTask, BatchNumber },
@@ -42,7 +42,7 @@ export class LastPackageService {
     }
   }
 
-  async updateBoxNumber(gtin, DateTask, BoxNumber, BatchNumber) {
+  async updateBoxNumber(gtin: string, DateTask: string, BoxNumber: number, BatchNumber: string) {
     await this.lastPackageEntityRepository.update(
       { gtin: gtin, DateTask: DateTask, BatchNumber: BatchNumber },
       {
@@ -51,7 +51,7 @@ export class LastPackageService {
     );
   }
 
-  async updatePalletNumber(gtin, DateTask, PalletNumber, BatchNumber) {
+  async updatePalletNumber(gtin: string, DateTask: string, PalletNumber: number, BatchNumber: string) {
     await this.lastPackageEntityRepository.update(
       { gtin: gtin, DateTask: DateTask, BatchNumber: BatchNumber },
       {

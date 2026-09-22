@@ -34,16 +34,18 @@ export class CodeService {
       //            codeLogger.info(`Код ${code} успешно сохранён`);
 
       console.log('Время: ', performance.now() - startTime);
+      console.log(`Код: ${code} \n сохранён`)
+
 
       return { message: 'Код успешно сохранён' };
-    } catch (error: any) {
-      if (error?.code === '23505') {
+    } catch (err: any) {
+      if (err?.code === '23505') {
         codeLogger.warn(`Попытка дублирования кода: ${code}`);
         throw new ConflictException('Код уже существует в базе');
       }
 
       codeLogger.error(
-        `Ошибка при сохранении кода: ${error?.message || error}`,
+        `Ошибка при сохранении кода: ${err?.message || err}`,
       );
       throw new InternalServerErrorException('Ошибка при сохранении кода');
     }
@@ -78,13 +80,10 @@ export class CodeService {
   }
 
   async getCodes(codes: string[]) {
-    console.log(codes, 'sfsfs');
-
     const data = await this.codeRepository.query(
       'SELECT code FROM "code_entity" WHERE code = ANY($1)',
       [codes],
     );
-    console.log(data);
     return data.map((el: any) => el.code);
   }
 

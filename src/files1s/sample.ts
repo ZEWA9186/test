@@ -180,4 +180,22 @@ export const TASK: IDefaultTask[] = [
     comment: '',
     required: true,
   },
+  {
+    name: 'lines',
+    label: 'Номера линий',
+    comment: 'Номера линий для задачи',
+    required: true,
+  },
+  {
+    name: 'codesPerLine',
+    label: 'Количество кодов по линиям',
+    comment: 'Массив с количеством кодов, распределенных по линиям (например: [300, 500, 200])',
+    required: true,
+  },
+  {
+    name: 'codes',
+    label: 'Коды маркировки',
+    comment: 'Массив кодов маркировки',
+    required: true,
+  },
 ];

@@ -3,10 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TrialEntity } from './entities/trial.entity';
 import { TrialService } from './trial.service';
 import { TrialHeaderMiddleware } from './trial-header.middleware';
+import {EventEmitterModule} from "@nestjs/event-emitter";
 // import {TrialController} from "./trial.controller";
 
 @Module({
-    imports: [TypeOrmModule.forFeature([TrialEntity])],
+    imports: [
+        TypeOrmModule.forFeature([TrialEntity]),
+    ],
     // controllers: [TrialController],
     providers: [TrialService, TrialHeaderMiddleware],
     exports: [TrialService],

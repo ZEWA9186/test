@@ -3,7 +3,7 @@ import * as path from 'path';
 import {
   getJsonDirectory1STemplate,
   getTemplateDirectory,
-} from 'src/path.util';
+} from '../path.utils';
 import { TASK } from './sample';
 
 export async function validateJson(
@@ -47,7 +47,7 @@ export async function validateJson(
         items: ['Шаблонный файл не содержит полей'],
       };
     }
-  } catch (err) {
+  } catch (err : any) {
     console.error('[VALIDATION] Ошибка загрузки шаблона:', err.message);
     return {
       errors: ['Ошибка загрузки шаблона'],
@@ -133,8 +133,86 @@ export async function validateJson(
           items.push(field.name);
         }
         break;
+      case 'lines': {
+        const max = parseInt(process.env.LINE_COUNT as string, 10);
+        const lines = (Array.isArray(value) ? value : [value]).map(Number);
 
-      case 'labelBox':
+        const isInvalid = !max ||
+            lines.length > max ||
+            lines.some((n) => !Number.isInteger(n) || n < 1 || n > max) ||
+            new Set(lines).size !== lines.length;
+
+        if (isInvalid) {
+          errors.push(`${field.label}: диапазон от 1 до ${max}, без дубликатов`);
+          items.push(field.name);
+        }
+        break;
+      }
+
+      case 'codesPerLine': {
+        if (!Array.isArray(value)) {
+          errors.push(`${field.label} должен быть массивом`);
+          items.push(field.name);
+          break;
+        }
+
+        const lines = Array.isArray(jsonData.lines) ? jsonData.lines : [];
+
+        const isInvalid =
+            value.length !== lines.length ||
+            value.some((n) => !Number.isInteger(n) || n < 0);
+
+        if (isInvalid) {
+          errors.push(
+              `${field.label}: количество элементов должно совпадать с числом выбранных линий (${lines.length}), а значения должны быть неотрицательными целыми числами`,
+          );
+          items.push(field.name);
+        }
+        break;
+      }
+      case 'codes': {
+        if (!Array.isArray(value)) {
+          errors.push(`${field.label} должен быть массивом`);
+          items.push(field.name);
+          break;
+        }
+
+        if (value.length === 0) {
+          errors.push(`${field.label} массив не должен быть пустым`);
+          items.push(field.name);
+          break;
+        }
+
+        const expectedPrefix = jsonData.gtin ? `01${jsonData.gtin}` : null;
+
+        if (new Set(value).size !== value.length) {
+          errors.push(`${field.label} содержит повторяющиеся коды маркировки`);
+          items.push(field.name);
+        }
+
+        if (expectedPrefix && value.some((c) => !c.startsWith(expectedPrefix))) {
+          errors.push(`${field.label} содержит коды, не соответствующие GTIN задания`);
+          items.push(field.name);
+        }
+        const lines = (Array.isArray(jsonData.lines) ? jsonData.lines : [jsonData.lines]).map(Number);
+
+        if (lines.length !== 1) {
+          if (Array.isArray(jsonData.codesPerLine)) {
+            const totalCodesPerLine = jsonData.codesPerLine.reduce(
+                (sum: number, lineCount: any) => sum + Number(lineCount),
+                0
+            );
+            if (totalCodesPerLine !== value.length) {
+              errors.push(
+                  `Сумма кодов по линиям (${totalCodesPerLine}) не совпадает с общим количеством кодов (${value.length})`
+              );
+              items.push(field.name);
+            }
+          }
+        }
+        break;
+      }
+        case 'labelBox':
       case 'labelPallet':
         const templateDirectory = getTemplateDirectory();
         const templateFilePath = `${templateDirectory}/${value}.prn`;

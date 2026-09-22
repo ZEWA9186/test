@@ -11,6 +11,6 @@ export class TrialEntity {
     @Column({ type: 'int', default: 86400, name: 'remaining_minutes' })
     remainingMinutes: number;
     
-    @Column({ type: 'boolean', nullable: false, default: true, name: 'is_trial' })
+    @Column({ type: 'boolean', nullable: false, name: 'is_trial' })
     isTrial: boolean;
 }
