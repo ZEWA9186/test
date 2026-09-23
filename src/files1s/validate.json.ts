@@ -133,39 +133,13 @@ export async function validateJson(
           items.push(field.name);
         }
         break;
-      case 'lines': {
+      case 'line': {
         const max = parseInt(process.env.LINE_COUNT as string, 10);
-        const lines = (Array.isArray(value) ? value : [value]).map(Number);
+        const line = Number(value);
 
-        const isInvalid = !max ||
-            lines.length > max ||
-            lines.some((n) => !Number.isInteger(n) || n < 1 || n > max) ||
-            new Set(lines).size !== lines.length;
 
-        if (isInvalid) {
-          errors.push(`${field.label}: диапазон от 1 до ${max}, без дубликатов`);
-          items.push(field.name);
-        }
-        break;
-      }
-
-      case 'codesPerLine': {
-        if (!Array.isArray(value)) {
-          errors.push(`${field.label} должен быть массивом`);
-          items.push(field.name);
-          break;
-        }
-
-        const lines = Array.isArray(jsonData.lines) ? jsonData.lines : [];
-
-        const isInvalid =
-            value.length !== lines.length ||
-            value.some((n) => !Number.isInteger(n) || n < 0);
-
-        if (isInvalid) {
-          errors.push(
-              `${field.label}: количество элементов должно совпадать с числом выбранных линий (${lines.length}), а значения должны быть неотрицательными целыми числами`,
-          );
+        if (line > max ) {
+          errors.push(`${field.label}: диапазон от 1 до ${max}`);
           items.push(field.name);
         }
         break;
@@ -193,22 +167,6 @@ export async function validateJson(
         if (expectedPrefix && value.some((c) => !c.startsWith(expectedPrefix))) {
           errors.push(`${field.label} содержит коды, не соответствующие GTIN задания`);
           items.push(field.name);
-        }
-        const lines = (Array.isArray(jsonData.lines) ? jsonData.lines : [jsonData.lines]).map(Number);
-
-        if (lines.length !== 1) {
-          if (Array.isArray(jsonData.codesPerLine)) {
-            const totalCodesPerLine = jsonData.codesPerLine.reduce(
-                (sum: number, lineCount: any) => sum + Number(lineCount),
-                0
-            );
-            if (totalCodesPerLine !== value.length) {
-              errors.push(
-                  `Сумма кодов по линиям (${totalCodesPerLine}) не совпадает с общим количеством кодов (${value.length})`
-              );
-              items.push(field.name);
-            }
-          }
         }
         break;
       }

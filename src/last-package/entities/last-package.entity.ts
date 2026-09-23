@@ -5,7 +5,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 
-@Entity('last-package')
+@Entity('last_package')
 export class LastPackageEntity {
   @PrimaryGeneratedColumn()
   id: number;
@@ -14,17 +14,17 @@ export class LastPackageEntity {
   gtin: string;
 
   @Column()
-  BoxNumber: number;
+  boxNumber: number;
 
   @Column()
-  PalletNumber: number;
+  palletNumber: number;
 
   @Column()
-  DateTask: string;
+  dateTask: string;
 
   @CreateDateColumn()
   createdAt: Date;
 
   @Column()
-  BatchNumber: string;
+  batchNumber: string;
 }

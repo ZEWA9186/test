@@ -13,7 +13,7 @@ import * as dotenv from 'dotenv';
 import {CodeService} from "../code/code.service";
 
 dotenv.config();
-const interval = /*+process.env.CHECK_1S_INTERVAL*/ 6000;
+const interval = Number(process.env.CHECK_1S_INTERVAL) || 6000;
 
 @Injectable()
 export class Task1sService implements OnModuleInit {
@@ -285,31 +285,17 @@ export class Task1sService implements OnModuleInit {
       return { success: false, errors, items };
     }
 
-    const targetLines: number[] = (Array.isArray(jsonParsed.lines) ? jsonParsed.lines : [jsonParsed.lines]).map(Number);    const codes: string[] = jsonParsed.codes;
-    const codesPerLine: number[] = (jsonParsed.codesPerLine).map(Number);
-
-    const codeChunks = this.splitArrayByLineCounts(codes, codesPerLine);
-
-    for (let i = 0; i < targetLines.length; i++) {
-      const lineNum = targetLines[i];
-      const targetDir = getLineTaskDirectory(lineNum);
+      const targetDir = getLineTaskDirectory(jsonParsed.line);
 
       await fs.promises.mkdir(targetDir, { recursive: true });
 
-      const { codes: _, codesPerLine: __, lines: ___, ...restJson } = jsonParsed;
-
-      const lineTaskPayload = {
-        ...restJson,
-        codes: codeChunks[i]
-      };
-
-      const newFileName = this.generateFilename(lineTaskPayload);
+      const newFileName = this.generateFilename(jsonParsed);
       const taskFilePath = path.join(targetDir, newFileName);
 
-      await fs.promises.writeFile(taskFilePath, JSON.stringify(lineTaskPayload, null, 2).trim());
-    }
+      await fs.promises.writeFile(taskFilePath, JSON.stringify(jsonParsed, null, 2).trim());
 
-    return { success: true, errors: [], items: [], targetLinesCount: targetLines.length };
+
+    return { success: true, errors: [], items: []};
   }
 
   async processApiTask(jsonParsed: any) {
@@ -346,18 +332,5 @@ export class Task1sService implements OnModuleInit {
   public async refreshFiles(): Promise<string[]> {
     await this.checkFilesInDirectory();
     return this.files;
-  }
-
-  private splitArrayByLineCounts(array: string[], codesPerLine: number[]): string[][] {
-    const result: string[][] = [];
-    let currentIndex = 0;
-
-    for (const count of codesPerLine) {
-      const chunk = array.slice(currentIndex, currentIndex + count);
-      result.push(chunk);
-      currentIndex += count;
-    }
-
-    return result;
   }
 }

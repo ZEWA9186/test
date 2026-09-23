@@ -8,5 +8,5 @@ export const DatabaseProviders = TypeOrmModule.forRoot({
     password: '123',
     database: 'server_trial_db',
     autoLoadEntities: true,
-    synchronize: false,
+    synchronize: true,
 });

@@ -10,53 +10,38 @@ export class LastPackageService {
     private lastPackageEntityRepository: Repository<LastPackageEntity>,
   ) {}
 
-  async addNoteAndTook(
-    gtin: string,
-    DateTask: string,
-    BatchNumber: string,
-  ): Promise<{
-    boxNumber: number;
-    palletNumber: number;
-  }> {
-    const result = await this.lastPackageEntityRepository.findOne({
-      where: { gtin, DateTask, BatchNumber },
+  async updateBoxNumber(gtin: string, dateTask: string, batchNumber: string) {
+    const existing = await this.lastPackageEntityRepository.findOne({
+      where: { gtin, dateTask, batchNumber },
     });
-    if (result === null) {
-      const data = this.lastPackageEntityRepository.create({
-        gtin: gtin,
-        BoxNumber: 1,
-        PalletNumber: 1,
-        DateTask: DateTask,
-        BatchNumber: BatchNumber,
+
+    const result = existing ?? this.lastPackageEntityRepository.create({
+        gtin,
+        boxNumber: 1,
+        dateTask,
+        batchNumber,
       });
-      const saveBox = await this.lastPackageEntityRepository.save(data);
-      return {
-        boxNumber: saveBox.BoxNumber,
-        palletNumber: saveBox.PalletNumber,
-      };
-    } else {
-      return {
-        boxNumber: result.BoxNumber,
-        palletNumber: result.PalletNumber,
-      };
-    }
+    result.boxNumber += 1;
+
+    const saved = await this.lastPackageEntityRepository.save(result);
+    return saved.boxNumber;
   }
 
-  async updateBoxNumber(gtin: string, DateTask: string, BoxNumber: number, BatchNumber: string) {
-    await this.lastPackageEntityRepository.update(
-      { gtin: gtin, DateTask: DateTask, BatchNumber: BatchNumber },
-      {
-        BoxNumber: BoxNumber,
-      },
-    );
-  }
+  async updatePalletNumber(gtin: string, dateTask: string, batchNumber: string) {
 
-  async updatePalletNumber(gtin: string, DateTask: string, PalletNumber: number, BatchNumber: string) {
-    await this.lastPackageEntityRepository.update(
-      { gtin: gtin, DateTask: DateTask, BatchNumber: BatchNumber },
-      {
-        PalletNumber: PalletNumber,
-      },
-    );
+    const existing = await this.lastPackageEntityRepository.findOne({
+      where: { gtin, dateTask, batchNumber },
+    });
+
+      const result = existing ?? this.lastPackageEntityRepository.create({
+        gtin,
+        palletNumber: 1,
+        dateTask,
+        batchNumber,
+      });
+      result.palletNumber += 1;
+
+    const saved = await this.lastPackageEntityRepository.save(result);
+    return saved.palletNumber;
   }
 }
