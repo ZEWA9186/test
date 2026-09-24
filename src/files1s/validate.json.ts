@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import {logger1S} from '../logger-winston/winston.config';
 import {
   getJsonDirectory1STemplate,
   getTemplateDirectory,
@@ -22,7 +23,7 @@ export async function validateJson(
     );
 
     if (templateFiles.length === 0) {
-      console.error('[VALIDATION] В директории шаблонов нет JSON файлов');
+      logger1S.error('[VALIDATION] В директории шаблонов нет JSON файлов');
       return {
         errors: ['Не найден файл шаблона'],
         items: ['В директории шаблонов нет JSON файлов'],
@@ -30,7 +31,7 @@ export async function validateJson(
     }
 
     if (templateFiles.length > 1) {
-      console.warn(
+      logger1S.warn(
         `[VALIDATION] Найдено несколько JSON файлов в директории шаблонов. Будет использован первый: ${templateFiles[0]}`,
       );
     }
@@ -41,14 +42,14 @@ export async function validateJson(
 
     // Дополнительная проверка структуры шаблона
     if (templateFields.length === 0) {
-      console.error('[VALIDATION] Шаблонный файл не содержит полей');
+      logger1S.error('[VALIDATION] Шаблонный файл не содержит полей');
       return {
         errors: ['Шаблонный файл пустой'],
         items: ['Шаблонный файл не содержит полей'],
       };
     }
   } catch (err : any) {
-    console.error('[VALIDATION] Ошибка загрузки шаблона:', err.message);
+    logger1S.error('[VALIDATION] Ошибка загрузки шаблона:', err.message);
     return {
       errors: ['Ошибка загрузки шаблона'],
       items: ['Ошибка загрузки шаблона'],

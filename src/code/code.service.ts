@@ -19,7 +19,6 @@ export class CodeService {
   ) {}
 
   async validateAndSaveCode(code: string) {
-    const startTime = performance.now();
 
     if (!code) {
       throw new BadRequestException('Код не может быть пустым');
@@ -31,11 +30,6 @@ export class CodeService {
         'INSERT INTO "code_entity" ("code") VALUES ($1)',
         [code],
       );
-      //            codeLogger.info(`Код ${code} успешно сохранён`);
-
-      console.log('Время: ', performance.now() - startTime);
-      console.log(`Код: ${code} \n сохранён`)
-
 
       return { message: 'Код успешно сохранён' };
     } catch (err: any) {
@@ -63,7 +57,6 @@ export class CodeService {
 
     try {
       await this.codeRepository.insert(codes.map((code) => ({ code })));
-      codeLogger.info(`Коды успешно сохранены`);
 
       return { message: 'Коды успешно сохранены' };
     } catch (error: any) {
@@ -80,19 +73,34 @@ export class CodeService {
   }
 
   async getCodes(codes: string[]) {
-    const data = await this.codeRepository.query(
+    const data: CodeEntity[] = await this.codeRepository.query(
       'SELECT code FROM "code_entity" WHERE code = ANY($1)',
       [codes],
     );
-    return data.map((el: any) => el.code);
+    return data.map((el: CodeEntity) => el.code);
   }
 
   async deleteCode(code: string) {
     try {
       await this.codeRepository.delete({ code });
       codeLogger.info('Удаление кода');
+
       return { message: 'Код успешно удалён' };
     } catch (error: any) {
+      codeLogger.error(error.message || error);
+      throw new InternalServerErrorException();
+    }
+  }
+
+  async batchDeleteCodes(codes: string[]) {
+    if (!codes || !codes.length) {
+      return {message: 'Кодов не было'};
+    }
+    try {
+      await this.codeRepository.delete(codes);
+      codeLogger.info('Коды удалены');
+      return {message: 'Коды успешно удалены'}
+    }catch (error: any) {
       codeLogger.error(error.message || error);
       throw new InternalServerErrorException();
     }
