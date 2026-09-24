@@ -17,7 +17,7 @@ export class LastPackageService {
 
     const result = existing ?? this.lastPackageEntityRepository.create({
         gtin,
-        boxNumber: 1,
+        boxNumber: 0,
         dateTask,
         batchNumber,
       });
@@ -35,7 +35,7 @@ export class LastPackageService {
 
       const result = existing ?? this.lastPackageEntityRepository.create({
         gtin,
-        palletNumber: 1,
+        palletNumber: 0,
         dateTask,
         batchNumber,
       });

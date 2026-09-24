@@ -1,6 +1,5 @@
 import {Body, Controller, Get, HttpCode, HttpStatus, Post} from '@nestjs/common';
 import { CodeService } from './code.service';
-import {CodeEntity} from "./entities/code.entity";
 
 @Controller('code')
 export class CodeController {
@@ -30,11 +29,17 @@ export class CodeController {
     }
 
     @Post('get-codes')
-    async getCodes(@Body('codes') codes: string[]): Promise<CodeEntity []> {
+    async getCodes(@Body('codes') codes: string[]) {
         return await this.codeService.getCodes(codes);
+    }
+
+    @Post('batch-delete-code')
+    async batchDeleteCode(@Body('codes') codes: string[]): Promise<{ message: string }> {
+        return this.codeService.batchDeleteCodes(codes);
     }
 
     @Get()
     @HttpCode(HttpStatus.OK)
-    async getStatus(){}
+    async getStatus() {
+    }
 }
