@@ -74,7 +74,8 @@ export async function  initDirectories() {
 
     for (const dir of directories) {
         if (dir) {
-            await fs.promises.mkdir(dir, { recursive: true });      }
+            await fs.promises.mkdir(dir, { recursive: true });
+        }
     }
 
     console.log('Файловая структура инициализирована.');

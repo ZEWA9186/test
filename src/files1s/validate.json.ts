@@ -1,15 +1,21 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {logger1S} from '../logger-winston/winston.config';
+import {CodeValidationService} from './validate.codes';
 import {
   getJsonDirectory1STemplate,
   getTemplateDirectory,
 } from '../path.utils';
 import { TASK } from './sample';
+import { Injectable } from '@nestjs/common';
 
-export async function validateJson(
-  jsonData: any,
-): Promise<{ errors: string[]; items: string[] }> {
+@Injectable()
+export class JsonValidationService {
+  constructor(private readonly codeValidationService: CodeValidationService) {}
+
+  async validateJson(
+    jsonData: any,
+  ): Promise<{ errors: string[]; items: string[] }> {
   const errors: string[] = [];
   const items: string[] = [];
 
@@ -146,28 +152,13 @@ export async function validateJson(
         break;
       }
       case 'codes': {
-        if (!Array.isArray(value)) {
-          errors.push(`${field.label} должен быть массивом`);
-          items.push(field.name);
-          break;
-        }
-
-        if (value.length === 0) {
-          errors.push(`${field.label} массив не должен быть пустым`);
-          items.push(field.name);
-          break;
-        }
-
-        const expectedPrefix = jsonData.gtin ? `01${jsonData.gtin}` : null;
-
-        if (new Set(value).size !== value.length) {
-          errors.push(`${field.label} содержит повторяющиеся коды маркировки`);
-          items.push(field.name);
-        }
-
-        if (expectedPrefix && value.some((c) => !c.startsWith(expectedPrefix))) {
-          errors.push(`${field.label} содержит коды, не соответствующие GTIN задания`);
-          items.push(field.name);
+        const codeValidation = await this.codeValidationService.validate(
+          value,
+          jsonData.gtin,
+        );
+        if (codeValidation.errors.length > 0) {
+          errors.push(...codeValidation.errors);
+          items.push(...codeValidation.items);
         }
         break;
       }
@@ -186,4 +177,5 @@ export async function validateJson(
   }
 
   return { errors, items };
+}
 }

@@ -1,4 +1,10 @@
-import {HttpException, HttpStatus, Injectable, OnModuleInit} from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  LoggerService,
+  OnModuleInit,
+} from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -8,10 +14,14 @@ import {
   getLineTaskDirectory,
   initDirectories
 } from '../path.utils';
-import { validateJson } from './validate.json';
 import * as dotenv from 'dotenv';
 import {CodeService} from "../code/code.service";
 import {TaskCheckResult} from "./dto/task-check-result";
+import { Repository } from 'typeorm';
+import { TaskEntity } from './entities/task.entity';
+import { JsonValidationService } from './validate.json';
+import { CodeEntity } from '../code/entities/code.entity';
+import { TaskCodes } from './entities/task-codes';
 
 dotenv.config();
 const interval = Number(process.env.CHECK_1S_INTERVAL) || 60000;
@@ -21,8 +31,12 @@ export class Task1sService implements OnModuleInit {
   private files: string[] = [];
   private filesIn: string[] = [];
   private checkInterval: NodeJS.Timeout;
-  constructor(private readonly codeService: CodeService) {
-  }
+  constructor(
+    private readonly codeService: CodeService,
+    private readonly taskRepository: Repository<TaskEntity>,
+    private readonly jsonValidationService: JsonValidationService,
+    private readonly codeRepository: Repository<TaskCodes>,
+  ) {}
 
   async onModuleInit() {
     await initDirectories();
@@ -31,12 +45,10 @@ export class Task1sService implements OnModuleInit {
     logger1S.debug('Запуск проверки файлов от 1С...');
 
     this.checkInterval = setInterval(
-        () => this.checkFilesInDirectory(),
-        interval,
+      () => this.checkFilesInDirectory(),
+      interval,
     );
   }
-
-
 
   async onApplicationShutdown() {
     // Очищаем интервал при остановке приложения
@@ -45,169 +57,6 @@ export class Task1sService implements OnModuleInit {
     }
   }
 
-  // async checkFilesInDirectory() {
-  //   const directoryPath = getJsonDirectory1S();
-  //   const taskDirectoryPath = getTaskJsonDirectory();
-  //   const results: { success: boolean; message: string }[] = [];
-  //
-  //   console.log(results, 'checkFilesInDirectory');
-  //
-  //   try {
-  //     // Создаем папку для заданий если ее нет
-  //     await fs.promises.mkdir(taskDirectoryPath, { recursive: true });
-  //     console.log('------------start 1S check');
-  //
-  //     // Получаем списки файлов
-  //     const allFiles = await fs.promises.readdir(directoryPath);
-  //     this.files = allFiles.filter((file) => file.endsWith('.json'));
-  //     this.filesIn = allFiles.filter((file) => file.endsWith('.in'));
-  //
-  //     // Проверяем наличие файлов заданий
-  //     if (this.filesIn.length === 0) {
-  //       return {
-  //         success: false,
-  //         message: 'Нет файлов заданий от 1С (.in файлов)',
-  //         details: [],
-  //       };
-  //     }
-  //
-  //     // Проверяем наличие соответствующих json файлов
-  //     const validInFiles = this.filesIn.filter((fileIn) =>
-  //       this.files.includes(fileIn.replace('.in', '.json')),
-  //     );
-  //
-  //     if (validInFiles.length === 0) {
-  //       return {
-  //         success: false,
-  //         message: 'Нет соответствующих JSON файлов для обработки',
-  //         details: this.filesIn.map((fileIn) => ({
-  //           file: fileIn,
-  //           message: `Отсутствует JSON файл для ${fileIn}`,
-  //         })),
-  //       };
-  //     }
-  //
-  //     // Обрабатываем все валидные пары файлов
-  //     for (const fileIn of validInFiles) {
-  //       const jsonFileName = fileIn.replace('.in', '.json');
-  //       const jsonFilePath = path.join(directoryPath, jsonFileName);
-  //       const inFilePath = path.join(directoryPath, fileIn);
-  //
-  //       try {
-  //         // Чтение и валидация JSON
-  //         const jsonData = await fs.promises.readFile(jsonFilePath, 'utf-8');
-  //         let jsonParsed = null;
-  //
-  //         try {
-  //           jsonParsed = JSON.parse(jsonData.trim());
-  //         } catch (err : any) {
-  //           const errorMessage = `Ошибка парсинга JSON файла ${jsonFileName}: ${err.message}`;
-  //           this.logger.warn(errorMessage, { error: err });
-  //
-  //           // Добавляем ошибку в массив результатов
-  //           results.push({
-  //             success: false,
-  //             message: errorMessage,
-  //           });
-  //         }
-  //
-  //         console.log(results, 'sadsadadsa108');
-  //
-  //         const { errors, items } = await validateJson(jsonParsed);
-  //
-  //         const codesToCheck = Array.isArray(jsonParsed.codes) ? jsonParsed.codes : [];
-  //         const existingCodes = await this.codeService.getCodes(codesToCheck);
-  //
-  //         if (existingCodes.length > 0) {
-  //           errors.push(`Обнаружены дубликаты в базе данных: ${existingCodes.slice(0, 3).join(', ')}...`);
-  //           items.push('codes');
-  //         }
-  //
-  //         // Запись результата валидации в .in файл
-  //         await fs.promises.writeFile(
-  //           inFilePath,
-  //           JSON.stringify(
-  //             {
-  //               errors: [{ status: errors.length > 0 }],
-  //               items: errors.length > 0 ? items : undefined,
-  //             },
-  //             null,
-  //             2,
-  //           ),
-  //         );
-  //
-  //         // Переименование .in в .out
-  //         const outFilePath = inFilePath.replace('.in', '.out');
-  //         await fs.promises.rename(inFilePath, outFilePath);
-  //
-  //         if (errors.length === 0) {
-  //           const targetLines: number[] = (Array.isArray(jsonParsed.line)
-  //               ? jsonParsed.line
-  //               : [jsonParsed.line]).map(Number);
-  //
-  //           const codes: string[] = jsonParsed.codes;
-  //
-  //           const codesPerLine: number[] = (jsonParsed.codesPerLine).map(Number);
-  //
-  //           const codeChunks = this.splitArrayIntoChunks(codes, codesPerLine);
-  //
-  //           for (let i = 0; i < targetLines.length; i++) {
-  //             const lineNum = targetLines[i];
-  //
-  //             // Получаем путь через утилиту (она сама проверит .env и выбросит ошибку, если ключа нет)
-  //             const targetDir = getLineTaskDirectory(lineNum);
-  //
-  //             // Создаем директорию линии, если её нет
-  //             await fs.promises.mkdir(targetDir, { recursive: true });
-  //
-  //             const { codes, codesPerLine, lines, ...restJson } = jsonParsed;
-  //
-  //             const lineTaskPayload = {
-  //               ...restJson,
-  //               codes: codeChunks[i]
-  //             };
-  //
-  //             const newFileName = this.generateFilename(lineTaskPayload);
-  //             const taskFilePath = path.join(targetDir, newFileName);
-  //
-  //             const cleanedJsonData = JSON.stringify(lineTaskPayload, null, 2).trim();
-  //             await fs.promises.writeFile(taskFilePath, cleanedJsonData);
-  //           }
-  //
-  //           const message = `Файл ${jsonFileName} успешно разделен на ${targetLines.length} линий и сохранен`;
-  //           results.push({ success: true, message });
-  //         } else {
-  //           results.push({
-  //             success: false,
-  //             message: `Файл ${jsonFileName} содержит ошибки валидации (исходный файл сохранен)`,
-  //           });
-  //         }
-  //       } catch (error : any) {
-  //         results.push({
-  //           success: false,
-  //           message: `Ошибка обработки файла ${fileIn}: ${error.message}`,
-  //         });
-  //       }
-  //     }
-  //     console.log(results, 'sadsadadsa155');
-  //
-  //     return {
-  //       success: results.some((r) => r.success),
-  //       message: results.some((r) => r.success)
-  //         ? 'Обработка файлов завершена'
-  //         : 'Все файлы содержат ошибки',
-  //       details: results,
-  //       processedCount: results.length,
-  //     };
-  //   } catch (err : any) {
-  //     return {
-  //       success: false,
-  //       message: `Системная ошибка: ${err.message}`,
-  //       details: [],
-  //     };
-  //   }
-  // }
-
   async checkFilesInDirectory() {
     const directoryPath = getJsonDirectory1S();
 
@@ -215,43 +64,17 @@ export class Task1sService implements OnModuleInit {
     this.filesIn = allFiles.filter((file) => file.endsWith('.in'));
 
     if (this.filesIn.length === 0) {
-      return [{success: false, message: 'Нет файлов заданий от 1С'}];
+      return [{ success: false, message: 'Нет файлов заданий от 1С' }];
     }
 
     const validInFiles = this.filesIn.filter((fileIn) =>
-        allFiles.includes(fileIn.replace('.in', '.json')),
+      allFiles.includes(fileIn.replace('.in', '.json')),
     );
     const result = [];
     for (const fileIn of validInFiles) {
       result.push(await this.processSingleFile(fileIn, directoryPath));
     }
     return result;
-  }
-
-  async processTaskPayload(jsonParsed: any): Promise<TaskCheckResult> {
-    const { errors, items } = await validateJson(jsonParsed);
-
-    const codesToCheck = Array.isArray(jsonParsed.codes) ? jsonParsed.codes : [];
-    const existingCodes = await this.codeService.getCodes(codesToCheck);
-
-    if (existingCodes.length > 0) {
-      errors.push('Обнаружены дубликаты в базе данных');
-      items.push('codes');
-    }
-
-    if (errors.length > 0) {
-      return { success: false, errors, items };
-    }
-
-    const targetDir = getLineTaskDirectory(jsonParsed.line);
-    await fs.promises.mkdir(targetDir, { recursive: true });
-
-    const newFileName = this.generateFilename(jsonParsed);
-    const taskFilePath = path.join(targetDir, newFileName);
-
-    await fs.promises.writeFile(taskFilePath, JSON.stringify(jsonParsed, null, 2).trim());
-
-    return { success: true };
   }
 
   async processApiTask(jsonParsed: any) {
@@ -262,8 +85,10 @@ export class Task1sService implements OnModuleInit {
     return result;
   }
 
-  private async processSingleFile(fileIn: string, directoryPath: string) : Promise<TaskCheckResult> {
-
+  private async processSingleFile(
+    fileIn: string,
+    directoryPath: string,
+  ): Promise<TaskCheckResult> {
     const jsonFileName = fileIn.replace('.in', '.json');
     const jsonFilePath = path.join(directoryPath, jsonFileName);
     const inFilePath = path.join(directoryPath, fileIn);
@@ -275,8 +100,8 @@ export class Task1sService implements OnModuleInit {
       const result = await this.processTaskPayload(jsonParsed);
 
       await fs.promises.writeFile(
-          inFilePath,
-          JSON.stringify(this.format1sResponse(result),null, 2,),
+        inFilePath,
+        JSON.stringify(this.format1sResponse(result), null, 2),
       );
 
       const outFilePath = inFilePath.replace('.in', '.out');
@@ -296,12 +121,65 @@ export class Task1sService implements OnModuleInit {
         };
       }
     } catch (error: any) {
-      logger1S.error(`Ошибка при обработке файла ${fileIn}: ${error.message}`, error.stack);
+      logger1S.error(
+        `Ошибка при обработке файла ${fileIn}: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
-        errors : error.message,
+        errors: error.message,
         message: `Ошибка обработки ${fileIn}`,
       };
+    }
+  }
+
+  private async processTaskPayload(jsonParsed: any): Promise<TaskCheckResult> {
+    const { errors, items } =
+      await this.jsonValidationService.validateJson(jsonParsed);
+
+    const codesToCheck = Array.isArray(jsonParsed.codes)
+      ? jsonParsed.codes
+      : [];
+    const existingCodes = await this.codeService.getCodes(codesToCheck);
+
+    if (existingCodes.length > 0) {
+      errors.push('Обнаружены дубликаты в базе данных');
+      items.push('codes');
+    }
+
+    if (errors.length > 0) {
+      return { success: false, errors, items };
+    }
+
+    const taskEntity = this.taskRepository.create({
+      ...jsonParsed,
+      codes: codesToCheck.map((codeStr: string) => ({ code: codeStr })),
+    });
+
+    try {
+      const savedTask = await this.taskRepository.save(taskEntity);
+
+      const targetDir = getLineTaskDirectory(jsonParsed.line);
+      await fs.promises.mkdir(targetDir, { recursive: true });
+
+      const newFileName = this.generateFilename(jsonParsed);
+      const taskFilePath = path.join(targetDir, newFileName);
+
+      await fs.promises.writeFile(
+        taskFilePath,
+        JSON.stringify(savedTask, null, 2).trim(),
+      );
+
+      return { success: true };
+    } catch (err: any) {
+      errors.push(
+        `
+        Ошибка сохранения в базу
+        ${err.message}
+      `,
+      );
+      logger1S.error(`Ошибка сохранения в базу, ${err.message}`);
+      return { success: false, errors, items };
     }
   }
 
@@ -323,9 +201,8 @@ export class Task1sService implements OnModuleInit {
     const cleanGtin = gtin.replace(/[^a-zA-Z0-9_-]/g, '');
     const cleanItf14 = itf14.replace(/[^a-zA-Z0-9_-]/g, '');
     const cleanBatch = batch.replace(/[^a-zA-Z0-9_-]/g, '');
-    const id = Date.now()
 
-    return `${cleanGtin}${cleanItf14}_${cleanBatch}_${id}.json`;
+    return `${cleanGtin}${cleanItf14}_${cleanBatch}.json`;
   }
 
   public async getFiles(): Promise<string[]> {
@@ -334,6 +211,24 @@ export class Task1sService implements OnModuleInit {
 
   public async refreshFiles(): Promise<string[]> {
     await this.checkFilesInDirectory();
-    return this.files;
+    const directoryPath = getJsonDirectory1S();
+    const allFiles = await fs.promises.readdir(directoryPath);
+    return allFiles.filter((file) => file.endsWith('.json'));
+  }
+
+  public async deleteCodes(taskId: number) {
+    try {
+      const result = await this.codeRepository.delete({ taskId });
+      return {
+        success: true,
+        deletedCount: result.affected ?? 0,
+      };
+    } catch (err: any) {
+      logger1S.error(
+        `[TASK_CODES] Ошибка при удалении кодов для задачи ${taskId}:`,
+        err.message,
+      );
+      throw err;
+    }
   }
 }
