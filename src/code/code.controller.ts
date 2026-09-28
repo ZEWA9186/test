@@ -25,12 +25,12 @@ export class CodeController {
     @HttpCode(HttpStatus.OK)
     async deleteCode(@Body('code') code: string,
     ) {
-     return await this.codeService.deleteCode(code);
+      return await this.codeService.deleteCode(code);
     }
 
     @Post('get-codes')
     async getCodes(@Body('codes') codes: string[]) {
-        return await this.codeService.getCodes(codes);
+      return await this.codeService.getCodes(codes);
     }
 
     @Post('batch-delete-code')
