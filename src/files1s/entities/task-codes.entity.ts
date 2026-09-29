@@ -1,6 +1,5 @@
 import {
   Entity,
-  PrimaryColumn,
   Column,
   ManyToOne,
   JoinColumn,
@@ -10,7 +9,7 @@ import {
 import { TaskEntity } from './task.entity';
 
 @Entity('task_codes')
-export class TaskCodes {
+export class TaskCodesEntity {
   @PrimaryGeneratedColumn()
   id: number;
 

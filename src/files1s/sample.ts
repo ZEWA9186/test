@@ -183,7 +183,7 @@ export const TASK: IDefaultTask[] = [
   {
     name: 'line',
     label: 'Номера линий',
-    comment: 'Номера линий для задачи',
+    comment: 'Номер линии для задачи',
     required: true,
   },
   {

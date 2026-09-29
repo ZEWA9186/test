@@ -5,17 +5,17 @@ import {
   CreateDateColumn,
   OneToMany,
 } from 'typeorm';
-import { TaskCodes } from './task-codes';
+import { TaskCodesEntity } from './task-codes.entity';
 
 @Entity('tasks')
 export class TaskEntity {
   @Column({ name: 'gtin', type: 'varchar', length: 14, nullable: true })
   gtin: string;
 
-  @Column({ name: 'name', type: 'text', nullable: true })
+  @Column({ name: 'name', type: 'varchar', nullable: true })
   name: string;
 
-  @Column({ name: 'description', type: 'text', nullable: true })
+  @Column({ name: 'description', type: 'varchar', nullable: true })
   description: string;
 
   @Column({ name: 'itf_14', type: 'varchar', length: 14, nullable: true })
@@ -27,7 +27,7 @@ export class TaskEntity {
   @Column({ name: 'label_pallet', type: 'varchar', nullable: true })
   labelPallet: string;
 
-  @Column({ name: 'inscription_label', type: 'text', nullable: true })
+  @Column({ name: 'inscription_label', type: 'varchar', nullable: true })
   inscriptionLabel: string;
 
   @Column({ name: 'tech_conditions', type: 'varchar', nullable: true })
@@ -39,14 +39,14 @@ export class TaskEntity {
   @Column({ name: 'other_tech_conditions', type: 'varchar', nullable: true })
   otherTechConditions: string;
 
-  @Column({ name: 'netto_unit', type: 'numeric', nullable: true })
-  nettoUnit: number;
+  @Column({ name: 'netto_unit', type: 'varchar', nullable: true })
+  nettoUnit: string;
 
-  @Column({ name: 'brutto_unit', type: 'numeric', nullable: true })
-  bruttoUnit: number;
+  @Column({ name: 'brutto_unit', type: 'varchar', nullable: true })
+  bruttoUnit: string;
 
-  @Column({ name: 'brutto_box', type: 'numeric', nullable: true })
-  bruttoBox: number;
+  @Column({ name: 'brutto_box', type: 'varchar', nullable: true })
+  bruttoBox: string;
 
   @Column({ name: 'temp_cond_1', type: 'varchar', nullable: true })
   tempCond1: string;
@@ -60,22 +60,22 @@ export class TaskEntity {
   @Column({ name: 'temp_cond_4', type: 'varchar', nullable: true })
   tempCond4: string;
 
-  @Column({ name: 'ad_info_1', type: 'text', nullable: true })
+  @Column({ name: 'ad_info_1', type: 'varchar', nullable: true })
   adInfo1: string;
 
-  @Column({ name: 'ad_info_2', type: 'text', nullable: true })
+  @Column({ name: 'ad_info_2', type: 'varchar', nullable: true })
   adInfo2: string;
 
-  @Column({ name: 'ad_info_3', type: 'text', nullable: true })
+  @Column({ name: 'ad_info_3', type: 'varchar', nullable: true })
   adInfo3: string;
 
-  @Column({ name: 'ad_info_4', type: 'text', nullable: true })
+  @Column({ name: 'ad_info_4', type: 'varchar', nullable: true })
   adInfo4: string;
 
-  @Column({ name: 'ad_info_5', type: 'text', nullable: true })
+  @Column({ name: 'ad_info_5', type: 'varchar', nullable: true })
   adInfo5: string;
 
-  @Column({ name: 'ad_info_6', type: 'text', nullable: true })
+  @Column({ name: 'ad_info_6', type: 'varchar', nullable: true })
   adInfo6: string;
 
   @Column({ name: 'batch', type: 'varchar', nullable: true })
@@ -84,32 +84,32 @@ export class TaskEntity {
   @Column({ name: 'packer', type: 'varchar', nullable: true })
   packer: string;
 
-  @Column({ name: 'date_manufacture', type: 'date', nullable: true })
+  @Column({ name: 'date_manufacture', type: 'varchar', nullable: true })
   date_manufacture: string;
 
-  @Column({ name: 'date_expiration', type: 'date', nullable: true })
+  @Column({ name: 'date_expiration', type: 'varchar', nullable: true })
   date_expiration: string;
 
-  @Column({ name: 'pieces_per_package', type: 'int', nullable: true })
-  pieces_per_package: number;
+  @Column({ name: 'pieces_per_package', type: 'varchar', nullable: true })
+  pieces_per_package: string;
 
-  @Column({ name: 'packaging_per_pallet', type: 'int', nullable: true })
-  packaging_per_pallet: number;
+  @Column({ name: 'packaging_per_pallet', type: 'varchar', nullable: true })
+  packaging_per_pallet: string;
 
-  @Column({ name: 'start_corob', type: 'int', nullable: true })
-  startCorob: number;
+  @Column({ name: 'start_corob', type: 'varchar', nullable: true })
+  startCorob: string;
 
-  @Column({ name: 'start_pallet', type: 'int', nullable: true })
-  startPallet: number;
+  @Column({ name: 'start_pallet', type: 'varchar', nullable: true })
+  startPallet: string;
 
-  @Column({ name: 'work_sh', type: 'int', nullable: true })
-  workSH: number;
+  @Column({ name: 'work_sh', type: 'varchar', nullable: true })
+  workSH: string;
 
-  @Column({ name: 'line', type: 'int', array: true, nullable: true })
-  line: number;
+  @Column({ name: 'line', type: 'varchar', nullable: true })
+  line: string;
 
-  @OneToMany(() => TaskCodes, (code) => code.task, { cascade: true })
-  codes: TaskCodes[];
+  @OneToMany(() => TaskCodesEntity, (code) => code.task, { cascade: true })
+  codes: TaskCodesEntity[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

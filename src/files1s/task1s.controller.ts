@@ -26,4 +26,9 @@ export class Task1sController {
     async refreshFiles(): Promise<string[]> {
         return this.task1sService.refreshFiles();
     }
+
+    @Post('delete-task')
+    async deleteTask(@Body() id: number): Promise<void> {
+        await this.task1sService.deleteTask(id);
+    }
 }
