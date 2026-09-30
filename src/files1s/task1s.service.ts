@@ -18,7 +18,7 @@ import * as dotenv from 'dotenv';
 import { TaskCheckResult } from './dto/task-check-result';
 import { Repository } from 'typeorm';
 import { TaskEntity } from './entities/task.entity';
-import { JsonValidationService } from './json-validate.service';
+import { JsonValidationService } from './validation/json-validate.service';
 import { TaskCodesEntity } from './entities/task-codes.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -97,6 +97,7 @@ export class Task1sService implements OnModuleInit {
   }
 
   public async checkFilesInDirectory() {
+    const startTime = performance.now();
     const directoryPath = getJsonDirectory1S();
 
     const allFiles = await fs.promises.readdir(directoryPath);
@@ -113,6 +114,7 @@ export class Task1sService implements OnModuleInit {
     for (const fileIn of validInFiles) {
       result.push(await this.processSingleFile(fileIn, directoryPath));
     }
+    logger1S.info(`Время выполнения checkFilesInDirectory:`, (startTime - performance.now()).toFixed(2));
     return result;
   }
 

@@ -4,8 +4,8 @@ import { Task1sService } from './task1s.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TaskEntity } from './entities/task.entity';
 import { TaskCodesEntity } from './entities/task-codes.entity';
-import { JsonValidationService } from './json-validate.service';
-import { CodeValidationService } from './code-validation.service';
+import { JsonValidationService } from './validation/json-validate.service';
+import { CodeValidationService } from './validation/code-validation.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([TaskEntity, TaskCodesEntity])],

@@ -1,14 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger1S } from '../logger-winston/winston.config';
+import { logger1S } from '../../logger-winston/winston.config';
 import { CodeValidationService } from './code-validation.service';
 import {
   getJsonDirectory1STemplate,
   getTemplateDirectory,
-} from '../path.utils';
+} from '../../path.utils';
 import { TASK } from './sample';
 import { Injectable } from '@nestjs/common';
-import { TaskValidationResult } from './dto/task-validation-dto';
+import { TaskValidationResult } from '../dto/task-validation-dto';
 
 @Injectable()
 export class JsonValidationService {

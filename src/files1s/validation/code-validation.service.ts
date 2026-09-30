@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, Repository } from 'typeorm';
-import { TaskCodesEntity } from './entities/task-codes.entity';
-import { TaskValidationResult } from './dto/task-validation-dto';
+import { TaskCodesEntity } from '../entities/task-codes.entity';
+import { TaskValidationResult } from '../dto/task-validation-dto';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { CodeEntity } from '../code/entities/code.entity';
-import { logger1S } from '../logger-winston/winston.config';
+import { CodeEntity } from '../../code/entities/code.entity';
+import { logger1S } from '../../logger-winston/winston.config';
 
 @Injectable()
 export class CodeValidationService {
