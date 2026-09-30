@@ -1,4 +1,4 @@
-import { TypeOrmModule } from '@nestjs/typeorm';
+import {TypeOrmModule} from '@nestjs/typeorm';
 
 export const DatabaseProviders = TypeOrmModule.forRoot({
     type: 'postgres',

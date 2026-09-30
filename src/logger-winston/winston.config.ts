@@ -11,9 +11,9 @@ const combinedTransport = new DailyRotateFile({
     datePattern: 'YYYY-MM-DD',
     maxFiles: '10d',
     format: winston.format.combine(
-        winston.format.timestamp({ format: 'HH:mm:ss' }),
-        winston.format.printf(({ timestamp, level, message, ...meta }) => {
-            const log = { level, message, timestamp, ...meta };
+        winston.format.timestamp({format: 'HH:mm:ss'}),
+        winston.format.printf(({timestamp, level, message, ...meta}) => {
+            const log = {level, message, timestamp, ...meta};
 
             logMessages.unshift(log);
             if (logMessages.length > MAX_IN_MEMORY_LOGS) {
@@ -32,11 +32,11 @@ const createLogger = (filename: string) => {
                 format: winston.format.combine(
                     winston.format.colorize({
                         all: true,
-                        colors: { info: 'blue', error: 'red', warn: 'yellow' },
+                        colors: {info: 'blue', error: 'red', warn: 'yellow'},
                     }),
-                    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+                    winston.format.timestamp({format: 'YYYY-MM-DD HH:mm:ss'}),
                     winston.format.printf(
-                        ({ timestamp, level, message }) =>
+                        ({timestamp, level, message}) =>
                             `[${filename}] ${timestamp} ${level}: ${message}`,
                     ),
                 ),
@@ -47,9 +47,9 @@ const createLogger = (filename: string) => {
                 datePattern: 'YYYY-MM-DD',
                 maxFiles: '10d',
                 format: winston.format.combine(
-                    winston.format.timestamp({ format: 'DD.MM.YYYY HH:mm:ss' }),
-                    winston.format.printf(({ timestamp, level, message, ...meta }) =>
-                        JSON.stringify({ level, message, timestamp, ...meta }),
+                    winston.format.timestamp({format: 'DD.MM.YYYY HH:mm:ss'}),
+                    winston.format.printf(({timestamp, level, message, ...meta}) =>
+                        JSON.stringify({level, message, timestamp, ...meta}),
                     ),
                 ),
             }),
@@ -61,6 +61,7 @@ const createLogger = (filename: string) => {
 export const codeLogger = createLogger('code');
 export const trialLogger = createLogger('trial');
 export const logger1S = createLogger('logger1S');
+export const backupLogger = createLogger('backup');
 
 export const getLastLogMessages = () => logMessages.slice(0, 1);
 export const getLogMessages = () => logMessages;

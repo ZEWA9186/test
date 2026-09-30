@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { Task1sController } from './task1s.controller';
-import { Task1sService } from './task1s.service';
+import {Module} from '@nestjs/common';
+import {Task1sController} from './task1s.controller';
+import {Task1sService} from './task1s.service';
 import {TypeOrmModule} from "@nestjs/typeorm";
 import {TaskEntity} from "./entities/task.entity";
 import {TaskCodesEntity} from "./entities/task-codes.entity";
@@ -10,7 +10,7 @@ import {CodeValidationService} from "./code-validation.service";
 @Module({
     imports: [
         TypeOrmModule.forFeature(
-        [TaskEntity, TaskCodesEntity]
+            [TaskEntity, TaskCodesEntity]
         ),
     ],
     controllers: [Task1sController],
@@ -21,4 +21,5 @@ import {CodeValidationService} from "./code-validation.service";
     ],
     exports: [Task1sService],
 })
-export class Task1sModule {}
+export class Task1sModule {
+}

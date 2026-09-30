@@ -1,15 +1,16 @@
 import {Controller, Post, Body, HttpStatus, HttpCode, Get} from '@nestjs/common';
-import { Task1sService } from './task1s.service';
+import {Task1sService} from './task1s.service';
 import {TaskCheckResult} from "./dto/task-check-result";
 
 @Controller('task-1s')
 export class Task1sController {
-    constructor(private readonly task1sService: Task1sService) {}
+    constructor(private readonly task1sService: Task1sService) {
+    }
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
     async processTask(@Body() jsonParsed: any): Promise<TaskCheckResult> {
-       return await this.task1sService.processApiTask(jsonParsed);
+        return await this.task1sService.processApiTask(jsonParsed);
     }
 
     @Get('check')

@@ -93,7 +93,7 @@ export class Task1sService implements OnModuleInit {
             return
         } catch (err: any) {
             logger1S.error(
-                `[TASK] Ошибка при удалении задачи ${id}:`,
+                `Ошибка при удалении задачи ${id}:`,
                 err.message,
             );
             throw new InternalServerErrorException(err)
@@ -180,14 +180,12 @@ export class Task1sService implements OnModuleInit {
             try {
                 const rawCodes: string[] = codes && codes.length > 0 ? codes : jsonParsed.codes;
 
-                const savedTask = await this.taskRepository.manager.transaction(async (manager) => {
-                    const taskEntity = manager.create(TaskEntity, {
-                        ...jsonParsed,
-                        codes: rawCodes.map((codeStr) => ({code: codeStr})),
-                    });
-
-                    return await manager.save(TaskEntity, taskEntity);
+                const taskEntity = this.taskRepository.create({
+                    ...jsonParsed,
+                    codes: rawCodes.map((codeStr) => ({code: codeStr})),
                 });
+
+                const savedTask = await this.taskRepository.save(taskEntity);
 
                 const targetDir = getLineTaskDirectory(jsonParsed.line);
                 await fs.promises.mkdir(targetDir, {recursive: true});

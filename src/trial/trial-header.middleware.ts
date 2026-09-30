@@ -5,12 +5,13 @@ import {
     ForbiddenException,
     BadRequestException, InternalServerErrorException,
 } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
-import { TrialService } from './trial.service';
+import {Request, Response, NextFunction} from 'express';
+import {TrialService} from './trial.service';
 
 @Injectable()
 export class TrialHeaderMiddleware implements NestMiddleware {
-    constructor(private readonly trialService: TrialService) {}
+    constructor(private readonly trialService: TrialService) {
+    }
 
 
     async use(req: Request, res: Response, next: NextFunction) {
@@ -48,13 +49,13 @@ export class TrialHeaderMiddleware implements NestMiddleware {
             req.connection?.remoteAddress
         );
 
-            try {
-                if(lineIp && lineIp.length > 1) {
-                    await this.trialService.validateLineTrial(lineIp);
-                }
-            } catch (e) {
-                throw new InternalServerErrorException()
+        try {
+            if (lineIp && lineIp.length > 1) {
+                await this.trialService.validateLineTrial(lineIp);
             }
+        } catch (e) {
+            throw new InternalServerErrorException()
+        }
         next();
     }
 }
