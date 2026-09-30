@@ -4,43 +4,35 @@ import {
   ConflictException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
-import { CodeEntity } from './entities/code.entity';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { codeLogger } from '../logger-winston/winston.config';
+import { CodeEntity } from './entities/code.entity';
 
 @Injectable()
 export class CodeService {
   constructor(
     @InjectDataSource()
     private dataSource: DataSource,
-    @InjectRepository(CodeEntity)
-    private readonly codeRepository: Repository<CodeEntity>,
   ) {}
 
   async validateAndSaveCode(code: string) {
-
     if (!code) {
       throw new BadRequestException('Код не может быть пустым');
     }
 
     try {
-      // await this.codeRepository.insert({ code });
       await this.dataSource.query(
         'INSERT INTO "code_entity" ("code") VALUES ($1)',
         [code],
       );
-
-      return { message: 'Код успешно сохранён' };
     } catch (err: any) {
       if (err?.code === '23505') {
         codeLogger.warn(`Попытка дублирования кода: ${code}`);
         throw new ConflictException('Код уже существует в базе');
       }
 
-      codeLogger.error(
-        `Ошибка при сохранении кода: ${err?.message || err}`,
-      );
+      codeLogger.error(`Ошибка при сохранении кода: ${err?.message || err}`);
       throw new InternalServerErrorException('Ошибка при сохранении кода');
     }
   }
@@ -56,9 +48,10 @@ export class CodeService {
     }
 
     try {
-      await this.codeRepository.insert(codes.map((code) => ({ code })));
-
-      return { message: 'Коды успешно сохранены' };
+      await this.dataSource.query(
+        'INSERT INTO "code_entity" ("code") SELECT unnest($1::text[])',
+        [codes],
+      );
     } catch (error: any) {
       if (error?.code === '23505') {
         codeLogger.warn('Один или несколько кодов уже есть в базе');
@@ -72,20 +65,32 @@ export class CodeService {
     }
   }
 
-  async getCodes(codes: string[]) {
-    const data: CodeEntity[] = await this.codeRepository.query(
-      'SELECT code FROM "code_entity" WHERE code = ANY($1)',
-      [codes],
-    );
-    return data.map((el: CodeEntity) => el.code);
+  async getCodes(codes: string[]): Promise<string[]> {
+    if (!codes || !codes.length) {
+      return [];
+    }
+
+    try {
+      const data: CodeEntity[] = await this.dataSource.query(
+        'SELECT code FROM "code_entity" WHERE code = ANY($1)',
+        [codes],
+      );
+      return data.map((el) => el.code);
+    } catch (error: any) {
+      codeLogger.error(
+        `Ошибка при получении кодов: ${error?.message || error}`,
+      );
+      throw new InternalServerErrorException('Ошибка при получении кодов');
+    }
   }
 
   async deleteCode(code: string) {
     try {
-      await this.codeRepository.delete({ code });
-      codeLogger.info('Удаление кода');
-
-      return { message: 'Код успешно удалён' };
+      await this.dataSource.query(
+        'DELETE FROM "code_entity" WHERE "code" = $1',
+        [code],
+      );
+      codeLogger.info('Код удалён');
     } catch (error: any) {
       codeLogger.error(error.message || error);
       throw new InternalServerErrorException();
@@ -94,13 +99,16 @@ export class CodeService {
 
   async batchDeleteCodes(codes: string[]) {
     if (!codes || !codes.length) {
-      return {message: 'Кодов не было'};
+      return;
     }
+
     try {
-      await this.codeRepository.delete(codes);
+      await this.dataSource.query(
+        'DELETE FROM "code_entity" WHERE "code" = ANY($1)',
+        [codes],
+      );
       codeLogger.info('Коды удалены');
-      return {message: 'Коды успешно удалены'}
-    }catch (error: any) {
+    } catch (error: any) {
       codeLogger.error(error.message || error);
       throw new InternalServerErrorException();
     }

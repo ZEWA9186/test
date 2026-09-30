@@ -1,34 +1,41 @@
-import {Controller, Post, Body, HttpStatus, HttpCode, Get} from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpStatus,
+  HttpCode,
+  Get,
+} from '@nestjs/common';
 import { Task1sService } from './task1s.service';
-import {TaskCheckResult} from "./dto/task-check-result";
+import { TaskCheckResult } from './dto/task-check-result';
 
 @Controller('task-1s')
 export class Task1sController {
-    constructor(private readonly task1sService: Task1sService) {}
+  constructor(private readonly task1sService: Task1sService) {}
 
-    @Post()
-    @HttpCode(HttpStatus.CREATED)
-    async processTask(@Body() jsonParsed: any): Promise<TaskCheckResult> {
-       return await this.task1sService.processApiTask(jsonParsed);
-    }
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async processTask(@Body() jsonParsed: any): Promise<TaskCheckResult> {
+    return await this.task1sService.processApiTask(jsonParsed);
+  }
 
-    @Get('check')
-    async checkFilesInDirectory(): Promise<TaskCheckResult[]> {
-        return await this.task1sService.checkFilesInDirectory();
-    }
+  @Get('check')
+  async checkFilesInDirectory(): Promise<TaskCheckResult[]> {
+    return await this.task1sService.checkFilesInDirectory();
+  }
 
-    @Get()
-    async getFiles(): Promise<string[]> {
-        return this.task1sService.getFiles();
-    }
+  @Get()
+  async getFiles(): Promise<string[]> {
+    return this.task1sService.getFiles();
+  }
 
-    @Get('refresh')
-    async refreshFiles(): Promise<string[]> {
-        return this.task1sService.refreshFiles();
-    }
+  @Get('refresh')
+  async refreshFiles(): Promise<string[]> {
+    return this.task1sService.refreshFiles();
+  }
 
-    @Post('delete-task')
-    async deleteTask(@Body() id: number): Promise<void> {
-        await this.task1sService.deleteTask(id);
-    }
+  @Post('delete-task')
+  async deleteTask(@Body() id: number): Promise<void> {
+    await this.task1sService.deleteTask(id);
+  }
 }

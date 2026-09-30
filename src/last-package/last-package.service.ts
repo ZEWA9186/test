@@ -15,7 +15,9 @@ export class LastPackageService {
       where: { gtin, dateTask, batchNumber },
     });
 
-    const result = existing ?? this.lastPackageEntityRepository.create({
+    const result =
+      existing ??
+      this.lastPackageEntityRepository.create({
         gtin,
         boxNumber: 0,
         dateTask,
@@ -27,19 +29,24 @@ export class LastPackageService {
     return saved.boxNumber;
   }
 
-  async updatePalletNumber(gtin: string, dateTask: string, batchNumber: string) {
-
+  async updatePalletNumber(
+    gtin: string,
+    dateTask: string,
+    batchNumber: string,
+  ) {
     const existing = await this.lastPackageEntityRepository.findOne({
       where: { gtin, dateTask, batchNumber },
     });
 
-      const result = existing ?? this.lastPackageEntityRepository.create({
+    const result =
+      existing ??
+      this.lastPackageEntityRepository.create({
         gtin,
         palletNumber: 0,
         dateTask,
         batchNumber,
       });
-      result.palletNumber += 1;
+    result.palletNumber += 1;
 
     const saved = await this.lastPackageEntityRepository.save(result);
     return saved.palletNumber;

@@ -9,6 +9,7 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: '50mb' }));
   await app.listen(process.env.PORT ?? 4001);
 }
+
 bootstrap().catch((err) => {
   console.error(err);
   process.exit(1);

@@ -1,5 +1,5 @@
 export interface TaskValidationResult {
-    codes?: string[];
-    errors: string[];
-    items: string[];
+  codes?: string[];
+  errors: string[];
+  items: string[];
 }

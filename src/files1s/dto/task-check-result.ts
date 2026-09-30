@@ -1,6 +1,6 @@
 export interface TaskCheckResult {
-    success: boolean;
-    errors?: string[];
-    items?: string[];
-    message?: string;
+  success: boolean;
+  errors?: string[];
+  items?: string[];
+  message?: string;
 }

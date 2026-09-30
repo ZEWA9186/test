@@ -1,82 +1,78 @@
-import path from "path";
-import * as fs from "node:fs";
+import path from 'node:path';
+import fs from 'node:fs/promises';
 
-export const getFilesDirectory1S = (): string => {
-    const val = process.env.FILES_DIRECTORY_1S;
-    if (!val) throw new Error('FILES_DIRECTORY_1S is not defined in .env file');
-    return val;
+const getEnv = (key: string): string => {
+  const val = process.env[key];
+  if (!val)
+    throw new Error(`[CONFIG ERROR] ${key} is not defined in .env file`);
+  return val;
 };
 
-export const getJsonDirectory1S = (): string => {
-    return path.join(getFilesDirectory1S());
-};
+export const getJsonDirectory1S = (): string => getEnv('FILES_DIRECTORY_1S');
 
-export const getFilesDirectory1STemplate = (): string => {
-    const val = process.env.FILES_DIRECTORY_1S_TEMPLATE;
-    if (!val) throw new Error('FILES_DIRECTORY_1S_TEMPLATE is not defined in .env file');
-    return val;
-};
+export const getJsonDirectory1STemplate = (): string =>
+  getEnv('FILES_DIRECTORY_1S_TEMPLATE');
 
-export const getJsonDirectory1STemplate = (): string => {
-    return path.join(getFilesDirectory1STemplate());
-};
-
-
-export const getAvailableFilesDirectory = (): string => {
-    const val = process.env.AVAILABLE_FILES_DIRECTORY;
-    if (!val) throw new Error('AVAILABLE_FILES_DIRECTORY is not defined in .env file');
-    return val;
-};
+export const getAvailableFilesDirectory = (): string =>
+  getEnv('AVAILABLE_FILES_DIRECTORY');
 
 export const getTemplateDirectory = (): string => {
-    return path.join(getAvailableFilesDirectory(), 'template_files');
+  return path.join(getAvailableFilesDirectory(), 'template_files');
 };
+
+export const getPostgresPath = (): string => getEnv('POSTGRES_PATH');
 
 export const getLineTaskDirectory = (lineNum: number): string => {
-    const envKey = `LINE_TASK_DIRECTORY${lineNum}`;
-    const lineDirectory = process.env[envKey];
-    if (!lineDirectory) {
-        throw new Error(`${envKey} is not defined in .env file`);
-    }
-    return path.resolve(lineDirectory);
+  const envKey = `LINE_TASK_DIRECTORY`;
+  return path.resolve(getEnv(envKey), `${lineNum}`);
 };
 
+export const getBackupDirectories = (): string[] => {
+  return getEnv('BACKUP_DIRS')
+    .split(',')
+    .map((d) => d.trim())
+    .filter(Boolean);
+};
 
-function validateEnvironment(): void {
+export const getLineCount = (): number => {
+  const rawLineCount = getEnv('LINE_COUNT');
+  const lineCount = parseInt(rawLineCount, 10);
+  if (isNaN(lineCount) || lineCount <= 0) {
+    throw new Error(
+      '[CONFIG ERROR] LINE_COUNT must be a valid positive integer',
+    );
+  }
+  return lineCount;
+};
 
-    const rawLineCount = process.env.LINE_COUNT;
-    if (!rawLineCount) {
-        throw new Error('[CONFIG ERROR] LINE_COUNT is not defined in .env file');
-    }
-    const lineCount = parseInt(rawLineCount, 10);
-    if (isNaN(lineCount) || lineCount <= 0) {
-        throw new Error('[CONFIG ERROR] LINE_COUNT must be a valid positive integer');
-    }
-
-    // 2. Проверяем обязательные базовые пути (выбросят ошибку, если пусто)
-    getAvailableFilesDirectory();
-    getFilesDirectory1S();
-    getFilesDirectory1STemplate();
-
-    // 3. Проверяем, что для каждой заявленной линии прописан свой SHARE_DIRECTORY
-    for (let i = 1; i <= lineCount; i++) {
-        getLineTaskDirectory(i);
-    }
+export function validateEnvironment(): void {
+  getAvailableFilesDirectory();
+  getJsonDirectory1S();
+  getJsonDirectory1STemplate();
+  getBackupDirectories();
+  getLineCount();
+  getPostgresPath();
+  getLineTaskDirectory(1);
 }
-export async function  initDirectories() {
-    validateEnvironment();
 
-    const directories = [
-        getJsonDirectory1S(),         // Входящие от 1С (1_tasks)
-        getJsonDirectory1STemplate(), // Шаблоны 1С (1_template)
-        getTemplateDirectory(),       // Принтерные шаблоны (.prn)
-    ];
+export async function initDirectories(): Promise<void> {
+  validateEnvironment();
 
-    for (const dir of directories) {
-        if (dir) {
-            await fs.promises.mkdir(dir, { recursive: true });
-        }
-    }
+  const lineCount = getLineCount();
+  const directories = [
+    getJsonDirectory1S(),
+    getJsonDirectory1STemplate(),
+    getTemplateDirectory(),
+    ...getBackupDirectories(),
+  ];
 
-    console.log('Файловая структура инициализирована.');
+  for (let i = 1; i <= lineCount; i++) {
+    directories.push(getLineTaskDirectory(i));
+  }
+
+  await Promise.all(
+    directories.map((dir) => fs.mkdir(dir, { recursive: true })),
+  );
+
+  console.log('Файловая структура инициализирована.');
 }
