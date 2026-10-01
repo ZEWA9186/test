@@ -140,16 +140,6 @@ export class JsonValidationService {
             items.push(field.name);
           }
           break;
-        case 'line': {
-          const max = parseInt(process.env.LINE_COUNT as string, 10);
-          const line = Number(value);
-
-          if (line < 1 || line > max) {
-            errors.push(`${field.label}: диапазон от 1 до ${max}`);
-            items.push(field.name);
-          }
-          break;
-        }
         case 'codes': {
           try {
             const shouldFilter = process.env.CODE_FILTER_ENABLED === 'true';

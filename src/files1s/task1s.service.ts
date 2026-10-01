@@ -184,25 +184,7 @@ export class Task1sService implements OnModuleInit {
           codes: rawCodes.map((codeStr) => ({ code: codeStr })),
         });
 
-        const savedTask = await this.taskRepository.save(taskEntity);
-
-        const targetDir = getLineTaskDirectory(jsonParsed.line);
-        await fs.promises.mkdir(targetDir, { recursive: true });
-
-        const newFileName = this.generateFilename(jsonParsed);
-        const taskFilePath = path.join(targetDir, newFileName);
-
-        await fs.promises.writeFile(
-          taskFilePath,
-          JSON.stringify(
-            {
-              ...savedTask,
-              codes: rawCodes,
-            },
-            (key, value) => (value === null ? undefined : value), // убирает null
-            2,
-          ).trim(),
-        );
+        await this.taskRepository.save(taskEntity);
 
         return { success: true };
       } catch (err: any) {

@@ -181,9 +181,9 @@ export const TASK: IDefaultTask[] = [
     required: true,
   },
   {
-    name: 'line',
-    label: 'Номера линий',
-    comment: 'Номер линии для задачи',
+    name: 'aggregationLvl',
+    label: 'Уровни агригации',
+    comment: '',
     required: true,
   },
   {

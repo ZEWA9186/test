@@ -18,7 +18,7 @@ export class CodeService {
 
   async validateAndSaveCode(code: string) {
     if (!code) {
-      throw new BadRequestException('Код не может быть пустым');
+      throw new BadRequestException('Код не считан');
     }
 
     try {
@@ -36,6 +36,8 @@ export class CodeService {
       throw new InternalServerErrorException('Ошибка при сохранении кода');
     }
   }
+
+  private async isLastPies
 
   async batchValidateAndSaveCode(codes: string[]) {
     if (!codes || !codes.length) {
