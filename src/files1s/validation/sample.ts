@@ -151,14 +151,26 @@ export const TASK: IDefaultTask[] = [
     required: true,
   },
   {
-    name: 'pieces_per_package',
-    label: 'Количество продуктов в коробе',
+    name: 'pieces_per_small_box',
+    label: 'Количество продуктов в малой коробе',
     comment: '',
     required: true,
   },
   {
-    name: 'packaging_per_pallet',
-    label: 'Количество коробов в паллете',
+    name: 'pieces_per_big_box',
+    label: 'Количество коробов в большой коробке',
+    comment: '',
+    required: true,
+  },
+  {
+    name: 'pieces_per_pallet',
+    label: 'Количество в палете',
+    comment: '',
+    required: true
+  },
+  {
+    name: 'aggregation_lvl',
+    label: 'Уровень агрегации',
     comment: '',
     required: true,
   },

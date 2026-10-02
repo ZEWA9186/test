@@ -3,10 +3,8 @@ import {
   PrimaryColumn,
   Column,
   ManyToOne,
-  OneToMany,
   JoinColumn,
 } from 'typeorm';
-import { PackagingEntity } from './packaging.entity';
 import { TaskEntity } from '../../files1s/entities/task.entity';
 
 export enum ExpectedScanType {
@@ -18,19 +16,19 @@ export enum ExpectedScanType {
 
 @Entity('active_tasks')
 export class ActiveTaskEntity {
-  @PrimaryColumn({ name: 'tsd_id' })
+  @PrimaryColumn({ name: 'tsd_id', type: 'int' })
   tsdId: number;
 
   @Column({ name: 'gtin', nullable: true })
   gtin: string;
 
-  @Column({ name: 'pieces_per_small_box', nullable: true })
+  @Column({ name: 'pieces_per_small_box', nullable: true, type: 'int' })
   piecesPerSmallBox: number;
 
-  @Column({ name: 'pieces_per_big_box', nullable: true })
+  @Column({ name: 'pieces_per_big_box', nullable: true, type: 'int' })
   piecesPerBigBox: number;
 
-  @Column({ name: 'pieces_per_pallet', nullable: true })
+  @Column({ name: 'pieces_per_pallet', nullable: true, type: 'int' })
   piecesPerPallet: number;
 
   @Column({
@@ -41,7 +39,7 @@ export class ActiveTaskEntity {
   })
   expectedScan: ExpectedScanType;
 
-  @Column({ name: 'aggregation_lvl', nullable: true })
+  @Column({ name: 'aggregation_lvl', nullable: true, type: 'int' })
   aggregationLvl: number;
 
   // Какая задача сейчас запущена на этом ТСД (Много ТСД могут ссылаться на 1 задачу)
@@ -52,7 +50,4 @@ export class ActiveTaskEntity {
   @JoinColumn({ name: 'task_id' })
   task: TaskEntity;
 
-  // Упаковки, которые этот конкретный ТСД успел насканить в рамках своей работы
-  @OneToMany(() => PackagingEntity, (packaging) => packaging.activeTask)
-  packagingTable: PackagingEntity[];
 }

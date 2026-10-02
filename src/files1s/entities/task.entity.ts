@@ -3,7 +3,7 @@ import {
     PrimaryGeneratedColumn,
     Column,
     CreateDateColumn,
-    OneToMany, OneToOne, JoinColumn,
+    OneToMany,
 } from 'typeorm';
 import {TaskCodesEntity} from './task-codes.entity';
 import { PackagingEntity } from '../../aggregation/entities/packaging.entity';
@@ -92,11 +92,14 @@ export class TaskEntity {
   @Column({ name: 'date_expiration', type: 'varchar', nullable: true })
   date_expiration: string;
 
-  @Column({ name: 'pieces_per_package', type: 'varchar', nullable: true })
-  pieces_per_package: string;
+  @Column({ name: 'pieces_per_small_box', type: 'int', nullable: true })
+  piecesPerSmallBox: number;
 
-  @Column({ name: 'packaging_per_pallet', type: 'varchar', nullable: true })
-  packaging_per_pallet: string;
+  @Column({ name: 'pieces_per_big_box', type: 'int', nullable: true })
+  piecesPerBigBox: number;
+
+  @Column({ name: 'pieces_per_pallet', type: 'int', nullable: true })
+  piecesPerPallet: number;
 
   @Column({ name: 'start_corob', type: 'varchar', nullable: true })
   startCorob: string;
@@ -107,7 +110,7 @@ export class TaskEntity {
   @Column({ name: 'work_sh', type: 'varchar', nullable: true })
   workSH: string;
 
-  @Column({ name: 'aggregation_lvl', type: 'number', nullable: true })
+  @Column({ name: 'aggregation_lvl', type: 'int', nullable: true })
   aggregationLvl: number;
 
   @OneToMany(() => TaskCodesEntity, (code) => code.task, { cascade: true })

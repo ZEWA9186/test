@@ -4,44 +4,41 @@ import {
   Entity,
   ManyToOne,
   PrimaryGeneratedColumn,
-  JoinColumn,
+  JoinColumn, Index,
 } from 'typeorm';
 import { TaskEntity } from '../../files1s/entities/task.entity';
-import { ActiveTaskEntity } from './active-task.entity';
 
+@Index(['task', 'tsdId', 'smallBoxLabel'])
+@Index(['task', 'tsdId', 'bigBoxLabel'])
+@Index(['task', 'tsdId', 'palletLabel'])
 @Entity('packaging')
 export class PackagingEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ nullable: true })
+  @Column()
   code: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'small_box_label', nullable: true })
   smallBoxLabel: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'big_box_label', nullable: true })
   bigBoxLabel: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'pallet_label', nullable: true })
   palletLabel: string;
 
-  @Column({ name: 'tsd_id' })
+  @Column({
+    name: 'tsd_id', type: 'int',})
   tsdId: number;
 
   @ManyToOne(
-    () => ActiveTaskEntity,
-    (activeTask) => activeTask.packagingTable,
-    {
-      onDelete: 'CASCADE',
-    },
+      () => TaskEntity,
+      (task) => task.packages,
+      {
+        onDelete: 'CASCADE',
+      },
   )
-  @JoinColumn({ name: 'tsd_id', referencedColumnName: 'tsdId' })
-  activeTask: ActiveTaskEntity;
-
-  @ManyToOne(() => TaskEntity, (task) => task.packages, {
-    onDelete: 'CASCADE',
-  })
   @JoinColumn({ name: 'task_id' })
   task: TaskEntity;
 

@@ -11,7 +11,6 @@ import * as path from 'path';
 import { logger1S } from '../logger-winston/winston.config';
 import {
   getJsonDirectory1S,
-  getLineTaskDirectory,
   initDirectories,
 } from '../path.utils';
 import * as dotenv from 'dotenv';
@@ -21,6 +20,7 @@ import { TaskEntity } from './entities/task.entity';
 import { JsonValidationService } from './validation/json-validate.service';
 import { TaskCodesEntity } from './entities/task-codes.entity';
 import { InjectRepository } from '@nestjs/typeorm';
+import {map1sJsonToTaskEntity} from "./task-mapper.helper";
 
 dotenv.config();
 const interval = Number(process.env.CHECK_1S_INTERVAL) || 60000;
@@ -178,11 +178,8 @@ export class Task1sService implements OnModuleInit {
       try {
         const rawCodes: string[] =
           codes && codes.length > 0 ? codes : jsonParsed.codes;
-
-        const taskEntity = this.taskRepository.create({
-          ...jsonParsed,
-          codes: rawCodes.map((codeStr) => ({ code: codeStr })),
-        });
+        const mappedData = map1sJsonToTaskEntity(jsonParsed, rawCodes);
+        const taskEntity = this.taskRepository.create(mappedData);
 
         await this.taskRepository.save(taskEntity);
 

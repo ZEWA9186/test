@@ -59,6 +59,9 @@ export class TaskService {
         tsdId,
         gtin: task.gtin,
         aggregationLvl: task.aggregationLvl,
+        piecesPerSmallBox: task.piecesPerSmallBox,
+        piecesPerBigBox: task.piecesPerBigBox,
+        piecesPerPallet: task.piecesPerPallet,
       });
     }
 

@@ -37,8 +37,6 @@ export class CodeService {
     }
   }
 
-  private async isLastPies
-
   async batchValidateAndSaveCode(codes: string[]) {
     if (!codes || !codes.length) {
       throw new BadRequestException('Передан пустой массив кодов');

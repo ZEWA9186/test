@@ -10,6 +10,8 @@ import { DatabaseProviders } from './database.providers';
 import { Task1sModule } from './files1s/task1s.module';
 import { LastPackageModule } from './last-package/last-package.module';
 import { BackupModule } from './backup/backup.module';
+import {AggregationModule} from "./aggregation/aggregation.module";
+import {TaskModule} from "./task/task.module";
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { BackupModule } from './backup/backup.module';
     Task1sModule,
     LastPackageModule,
     BackupModule,
+    AggregationModule,
+    TaskModule,
   ],
   controllers: [AppController],
   providers: [AppService],

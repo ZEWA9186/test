@@ -50,15 +50,12 @@ export function validateEnvironment(): void {
   getJsonDirectory1S();
   getJsonDirectory1STemplate();
   getBackupDirectories();
-  getLineCount();
-  getPostgresPath();
-  getLineTaskDirectory(1);
+  // getPostgresPath();
 }
 
 export async function initDirectories(): Promise<void> {
   validateEnvironment();
 
-  const lineCount = getLineCount();
   const directories = [
     getJsonDirectory1S(),
     getJsonDirectory1STemplate(),
@@ -66,9 +63,6 @@ export async function initDirectories(): Promise<void> {
     ...getBackupDirectories(),
   ];
 
-  for (let i = 1; i <= lineCount; i++) {
-    directories.push(getLineTaskDirectory(i));
-  }
 
   await Promise.all(
     directories.map((dir) => fs.mkdir(dir, { recursive: true })),
