@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { TaskEntity } from '../files1s/entities/task.entity';
+import { TaskEntity } from './entities/task.entity';
 import { Repository } from 'typeorm';
 import { ActiveTaskEntity } from '../aggregation/entities/active-task.entity';
 

@@ -1,6 +1,6 @@
 // task-mapper.helper.ts
 import { DeepPartial } from 'typeorm';
-import { TaskEntity } from './entities/task.entity';
+import { TaskEntity } from '../task/entities/task.entity';
 
 
 export function map1sJsonToTaskEntity(

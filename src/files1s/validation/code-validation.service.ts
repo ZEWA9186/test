@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, Repository } from 'typeorm';
-import { TaskCodesEntity } from '../entities/task-codes.entity';
+import { TaskCodesEntity } from '../../task/entities/task-codes.entity';
 import { TaskValidationResult } from '../dto/task-validation-dto';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { CodeEntity } from '../../code/entities/code.entity';

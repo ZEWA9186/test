@@ -1,11 +1,5 @@
-import {
-  Entity,
-  PrimaryColumn,
-  Column,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
-import { TaskEntity } from '../../files1s/entities/task.entity';
+import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { TaskEntity } from '../../task/entities/task.entity';
 
 export enum ExpectedScanType {
   PRODUCT = 'PRODUCT',
@@ -49,5 +43,4 @@ export class ActiveTaskEntity {
   })
   @JoinColumn({ name: 'task_id' })
   task: TaskEntity;
-
 }

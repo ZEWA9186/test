@@ -4,9 +4,10 @@ import {
   Entity,
   ManyToOne,
   PrimaryGeneratedColumn,
-  JoinColumn, Index,
+  JoinColumn,
+  Index,
 } from 'typeorm';
-import { TaskEntity } from '../../files1s/entities/task.entity';
+import { TaskEntity } from '../../task/entities/task.entity';
 
 @Index(['task', 'tsdId', 'smallBoxLabel'])
 @Index(['task', 'tsdId', 'bigBoxLabel'])
@@ -29,16 +30,14 @@ export class PackagingEntity {
   palletLabel: string;
 
   @Column({
-    name: 'tsd_id', type: 'int',})
+    name: 'tsd_id',
+    type: 'int',
+  })
   tsdId: number;
 
-  @ManyToOne(
-      () => TaskEntity,
-      (task) => task.packages,
-      {
-        onDelete: 'CASCADE',
-      },
-  )
+  @ManyToOne(() => TaskEntity, (task) => task.packages, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'task_id' })
   task: TaskEntity;
 

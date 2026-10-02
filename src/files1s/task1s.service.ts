@@ -16,9 +16,9 @@ import {
 import * as dotenv from 'dotenv';
 import { TaskCheckResult } from './dto/task-check-result';
 import { Repository } from 'typeorm';
-import { TaskEntity } from './entities/task.entity';
+import { TaskEntity } from '../task/entities/task.entity';
 import { JsonValidationService } from './validation/json-validate.service';
-import { TaskCodesEntity } from './entities/task-codes.entity';
+import { TaskCodesEntity } from '../task/entities/task-codes.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import {map1sJsonToTaskEntity} from "./task-mapper.helper";
 
