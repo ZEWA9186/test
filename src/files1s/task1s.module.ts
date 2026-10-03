@@ -4,13 +4,13 @@ import { Task1sService } from './task1s.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TaskEntity } from '../task/entities/task.entity';
 import { TaskCodesEntity } from '../task/entities/task-codes.entity';
-import { JsonValidationService } from './validation/json-validate.service';
-import { CodeValidationService } from './validation/code-validation.service';
+import { ValidationModule } from '../validation/validation.module';
+
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TaskEntity, TaskCodesEntity])],
+  imports: [TypeOrmModule.forFeature([TaskEntity, TaskCodesEntity]), ValidationModule],
   controllers: [Task1sController],
-  providers: [Task1sService, JsonValidationService, CodeValidationService],
+  providers: [Task1sService],
   exports: [Task1sService],
 })
 export class Task1sModule {}

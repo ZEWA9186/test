@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { ExpectedScanType } from './entities/active-task.entity';
 import { AggregationRepository } from './repository/aggregation.repository';
 import { AggregationProductService } from './helper-service/aggregation-product.service';
 import { AggregationContainerService } from './helper-service/aggregation-container.service';
 import { CodeService } from '../code/code.service';
+import { Gs1ParserService } from '../gs1-parser/gs1-parser.service';
 
 @Injectable()
 export class AggregationService {
@@ -13,6 +14,7 @@ export class AggregationService {
     private readonly aggregationProductService: AggregationProductService,
     private readonly aggregationContainerService: AggregationContainerService,
     private readonly codeService: CodeService,
+    private readonly gs1Parser: Gs1ParserService
   ) {}
 
   async processScan(tsdId: number, code: string) {
@@ -20,23 +22,11 @@ export class AggregationService {
 
     const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
 
+    const scanType = this.gs1Parser.getScanType(code, activeTask);
 
-    // TODO:
-    // Здесь вызывается сервис определения типа кода.
-    //
-    // const scanType =
-    //   await this.scanTypeService.identify(code);
-    //
-    // PRODUCT
-    // SMALL_BOX_LABEL
-    // BIG_BOX_LABEL
-    // PALLET_LABEL
-    //
-    // Далее:
-    //
-    // if (scanType !== activeTask.expectedScan) {
-    //   throw new BadRequestException(...);
-    // }
+    if (scanType !== activeTask.expectedScan) {
+      throw new BadRequestException(`Ожидался ${activeTask.expectedScan}`)
+    }
 
     if (activeTask.expectedScan === ExpectedScanType.PRODUCT) {
       return this.aggregationProductService.addProduct(activeTask, code);

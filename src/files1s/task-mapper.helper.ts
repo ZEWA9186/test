@@ -7,7 +7,7 @@ export function map1sJsonToTaskEntity(
     json: Record<string, any>,
     rawCodes?: string[],
 ): DeepPartial<TaskEntity> {
-    const codesArray: string[] = rawCodes ?? json.codes ?? [];
+    const codesArray: string[] = rawCodes ?? json.codes;
 
     return {
         gtin: json.gtin,
@@ -15,8 +15,9 @@ export function map1sJsonToTaskEntity(
         description: json.description,
         ITF14: json.ITF14 ?? json.itf_14,
 
-        labelBox: json.label_box ?? json.labelBox,
-        labelPallet: json.label_pallet ?? json.labelPallet,
+        smallBoxLabel: json.label_box ?? json.labelBox,
+        bigBoxLabel: json.big_box_label ?? json.bigBoxLabel,
+        palletLabel: json.pallet_lable ?? json.labelPallet,
         inscriptionLabel: json.inscription_label ?? json.inscriptionLabel,
 
         techConditions: json.tech_conditions ?? json.techConditions,
@@ -41,8 +42,8 @@ export function map1sJsonToTaskEntity(
 
         batch: json.batch,
         packer: json.packer,
-        date_manufacture: json.date_manufacture,
-        date_expiration: json.date_expiration,
+        dateManufacture: json.date_manufacture,
+        dateExpiration: json.date_expiration,
 
         piecesPerSmallBox: json.pieces_per_small_box ?? json.piecesPerSmallBox,
         piecesPerBigBox: json.pieces_per_big_box ?? json.piecesPerBigBox,

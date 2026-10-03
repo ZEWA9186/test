@@ -1,18 +1,3 @@
-export enum SearchFrom {
-  Code = 'code',
-  Box = 'box',
-  Pallet = 'pallet',
-  Unknown = 'unknown',
-}
-
-export interface Gs1ParseResult {
-  type: SearchFrom;
-  data?: Record<string, string>; // AI -> значение
-  semantic?: Record<string, string>; // AI -> семантический тип (gtin, itf14, etc.)
-  error?: string;
-  rawCode?: string;
-}
-
 export interface Gs1Template {
   id: number;
   template: string[];

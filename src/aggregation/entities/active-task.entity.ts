@@ -16,6 +16,18 @@ export class ActiveTaskEntity {
   @Column({ name: 'gtin', nullable: true })
   gtin: string;
 
+  @Column({ name: 'itf_14', type: 'varchar', length: 14, nullable: true })
+  ITF14: string;
+
+  @Column({ name: 'batch', type: 'varchar', nullable: true })
+  batch: string;
+
+  @Column({ name: 'date_manufacture', type: 'varchar', nullable: true })
+  dateManufacture: string;
+
+  @Column({ name: 'date_expiration', type: 'varchar', nullable: true })
+  dateExpiration: string;
+
   @Column({ name: 'pieces_per_small_box', nullable: true, type: 'int' })
   piecesPerSmallBox: number;
 

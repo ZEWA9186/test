@@ -1,179 +1,358 @@
-import { Inject, Injectable } from '@nestjs/common';
-import {
-  SearchFrom,
-  Gs1ParseResult,
-  Gs1Template,
-  Gs1ValidationResult,
-  FIXED_LENGTH_AI,
-  TemplateItem,
-} from './interfaces/gs1.types';
-import { Logger } from 'winston';
-import { loggerGS1 } from '../logger-winston/winston.config';
+import { BadRequestException, Injectable } from '@nestjs/common';
+
+import { FIXED_LENGTH_AI, TemplateItem } from './interfaces/gs1.types';
+
 import { TemplateTypes } from '../globalTypes';
 import { TemplateService } from '../template/template.service';
+import { ActiveTaskEntity, ExpectedScanType } from '../aggregation/entities/active-task.entity';
 
 @Injectable()
 export class Gs1ParserService {
-  private readonly GS = '\x1D'; // Group Separator (ASCII 29)
+  private readonly GS = '\x1D';
 
-  constructor(
-    private readonly templateService: TemplateService,
-    @Inject('GLOBAL_MONITORING_VARIABLES')
-    private readonly globalMonVar: IMonitoringVariables,
-    @Inject('winston') private readonly logger: Logger = loggerGS1,
-  ) {}
+  constructor(private readonly templateService: TemplateService) {}
 
-  async getSearchType(code: string): Promise<SearchFrom> {
-    const { type } = await this.getContainerNumber(code);
-    return type;
+  getScanType(code: string, activeTask: ActiveTaskEntity): ExpectedScanType {
+    if (!code) {
+      throw new BadRequestException('Пустой код');
+    }
+
+    if (!activeTask) {
+      throw new BadRequestException('Нет активного задания');
+    }
+
+    const normalizedCode = this.normalizeGS(code);
+
+    if (this.isProductCode(normalizedCode)) {
+      this.validateProduct(normalizedCode, activeTask);
+
+      return ExpectedScanType.PRODUCT;
+    }
+
+    const templates = this.templateService.getAll();
+
+    const smallBoxTemplate = templates.find((template) => template.type === TemplateTypes.SmallBox);
+
+    const bigBoxTemplate = templates.find((template) => template.type === TemplateTypes.BigBox);
+
+    const palletTemplate = templates.find((template) => template.type === TemplateTypes.Pallet);
+
+    if (smallBoxTemplate && this.validateTemplate(normalizedCode, smallBoxTemplate.template)) {
+      const parsedData = this.parseByTemplate(normalizedCode, smallBoxTemplate.template);
+
+      this.validateAgainstTask(parsedData, smallBoxTemplate.template, activeTask);
+
+      return ExpectedScanType.SMALL_BOX_LABEL;
+    }
+
+    if (bigBoxTemplate && this.validateTemplate(normalizedCode, bigBoxTemplate.template)) {
+      const parsedData = this.parseByTemplate(normalizedCode, bigBoxTemplate.template);
+
+      this.validateAgainstTask(parsedData, bigBoxTemplate.template, activeTask);
+
+      return ExpectedScanType.BIG_BOX_LABEL;
+    }
+
+    if (palletTemplate && this.validateTemplate(normalizedCode, palletTemplate.template)) {
+      const parsedData = this.parseByTemplate(normalizedCode, palletTemplate.template);
+
+      this.validateAgainstTask(parsedData, palletTemplate.template, activeTask);
+
+      return ExpectedScanType.PALLET_LABEL;
+    }
+
+    throw new BadRequestException('Код не соответствует формату товара, коробки или палеты');
   }
 
-  // Основной метод для определения типа и парсинга этикетки
-  async parseLabel(
-    code: string,
-    boxTemplate?: Gs1Template,
-    palletTemplate?: Gs1Template,
-  ): Promise<Gs1ParseResult> {
-    console.log('\n=== Парсинг GS1 этикетки ===');
-    console.log(`Код: ${this.escapeString(code)}`);
+  private validateProduct(code: string, activeTask: ActiveTaskEntity): void {
+    if (!code.startsWith('01')) {
+      throw new BadRequestException('Некорректный код товара: ожидается AI 01');
+    }
 
-    try {
-      // Базовая валидация
-      if (!code || code.length === 0) {
-        console.log('❌ Ошибка: Пустой код');
-        return {
-          type: SearchFrom.Unknown,
-          error: 'Пустой код',
-          rawCode: code,
-        };
-      }
+    const gtin = code.substring(2, 16);
 
-      // 1. Проверка на код продукта (простой код с суффиксом 21)
-      if (this.isProductCode(code)) {
-        console.log('✅ Определен как продукт (code)');
-        return {
-          type: SearchFrom.Code,
-          data: { code },
-          rawCode: code,
-        };
-      }
+    if (!/^\d{14}$/.test(gtin)) {
+      throw new BadRequestException(
+        `Некорректный GTIN товара: ожидается 14 цифр, получено "${gtin}"`,
+      );
+    }
 
-      // 2. Проверяем коробку, если есть шаблон
-      if (boxTemplate) {
-        console.log('\n--- Проверка шаблона коробки ---');
-        const validation = this.validateAgainstTemplate(code, boxTemplate.template);
+    if (!activeTask.gtin) {
+      throw new BadRequestException('В активном задании не указан GTIN');
+    }
 
-        if (validation.isValid) {
-          console.log('✅ Соответствует шаблону коробки');
-          const data = this.parseByTemplate(code, boxTemplate.template);
-          const semantic = this.getSemanticMap(boxTemplate.template);
-          console.log('📦 Распарсенные данные коробки:', this.formatParsedData(data));
-          return {
-            type: SearchFrom.Box,
-            data,
-            semantic,
-            rawCode: code,
-          };
-        } else {
-          console.log(`❌ Не соответствует: ${validation.error}`);
-        }
-      }
-
-      // 3. Проверяем паллету, если есть шаблон
-      if (palletTemplate) {
-        console.log('\n--- Проверка шаблона паллеты ---');
-        const validation = this.validateAgainstTemplate(code, palletTemplate.template);
-
-        if (validation.isValid) {
-          console.log('✅ Соответствует шаблону паллеты');
-          const data = this.parseByTemplate(code, palletTemplate.template);
-          const semantic = this.getSemanticMap(palletTemplate.template);
-          console.log('📦 Распарсенные данные паллеты:', this.formatParsedData(data));
-          return {
-            type: SearchFrom.Pallet,
-            data,
-            semantic,
-            rawCode: code,
-          };
-        } else {
-          console.log(`❌ Не соответствует: ${validation.error}`);
-        }
-      }
-
-      // 4. Если ничего не подошло
-      console.log('\n❌ Код не соответствует ни одному шаблону');
-      return {
-        type: SearchFrom.Unknown,
-        error: 'Код не соответствует ни одному из шаблонов',
-        rawCode: code,
-      };
-    } catch (error: any) {
-      console.error(`❌ Ошибка: ${error.message}`);
-      return {
-        type: SearchFrom.Unknown,
-        error: `Внутренняя ошибка: ${error.message}`,
-        rawCode: code,
-      };
+    if (gtin !== activeTask.gtin) {
+      throw new BadRequestException(
+        `GTIN товара не совпадает с заданием: ` + `ожидался ${activeTask.gtin}, получен ${gtin}`,
+      );
     }
   }
 
-  // Проверка, является ли код продуктом (простой код с 21 в конце)
   private isProductCode(code: string): boolean {
-    return code.length >= 18 && code.substring(16, 18) === '21';
+    return (
+      code.length >= 18 &&
+      code.startsWith('01') &&
+      /^\d{14}$/.test(code.substring(2, 16)) &&
+      code.substring(16, 18) === '21'
+    );
   }
 
-  // Проверка, имеет ли AI фиксированную длину
-  private isFixedLength(ai: string): boolean {
-    return ai in FIXED_LENGTH_AI;
-  }
+  private validateTemplate(code: string, template: string[]): boolean {
+    const normalizedCode = this.normalizeGS(code);
+    const normalizedTemplate = this.normalizeTemplate(template);
 
-  // Определение типа без парсинга
-  determineType(code: string, boxTemplate?: Gs1Template, palletTemplate?: Gs1Template): SearchFrom {
-    // Проверка на код продукта
-    if (this.isProductCode(code)) {
-      return SearchFrom.Code;
-    }
+    let position = 0;
 
-    // Проверка на коробку
-    if (boxTemplate && this.validateAgainstTemplate(code, boxTemplate.template).isValid) {
-      return SearchFrom.Box;
-    }
+    for (let i = 0; i < normalizedTemplate.length; i++) {
+      const item = normalizedTemplate[i];
 
-    // Проверка на паллету
-    if (palletTemplate && this.validateAgainstTemplate(code, palletTemplate.template).isValid) {
-      return SearchFrom.Pallet;
-    }
-
-    return SearchFrom.Unknown;
-  }
-
-  // Нормализация шаблона - преобразует строки типа "01 gtin" в объект TemplateItem
-  private normalizeTemplate(template: string[]): TemplateItem[] {
-    return template.map((item) => {
-      // Если строка пустая или только пробелы
-      if (!item || item.trim() === '') {
-        return {
-          ai: '',
-          fullString: '',
-        };
+      if (!item.ai) {
+        continue;
       }
 
-      // Разделяем на AI и семантику
-      const parts = item.trim().split(/\s+/);
-      const ai = parts[0];
-      const semantic = parts.slice(1).join(' ');
+      const ai = item.ai;
 
-      return {
-        ai: ai,
-        semantic: semantic || undefined,
-        fullString: item,
-      };
-    });
+      const actualAI = normalizedCode.substring(position, position + ai.length);
+
+      if (actualAI !== ai) {
+        return false;
+      }
+
+      position += ai.length;
+
+      if (this.isFixedLength(ai)) {
+        const fixedLength = FIXED_LENGTH_AI[ai];
+
+        if (position + fixedLength > normalizedCode.length) {
+          return false;
+        }
+
+        position += fixedLength;
+        continue;
+      }
+
+      const nextGSPosition = normalizedCode.indexOf(this.GS, position);
+
+      if (nextGSPosition === -1) {
+        if (i === normalizedTemplate.length - 1) {
+          position = normalizedCode.length;
+          continue;
+        }
+
+        return false;
+      }
+
+      if (i < normalizedTemplate.length - 1) {
+        const nextItem = normalizedTemplate[i + 1];
+
+        if (nextItem.ai) {
+          const nextAIPosition = nextGSPosition + 1;
+
+          if (nextAIPosition + nextItem.ai.length > normalizedCode.length) {
+            return false;
+          }
+
+          const nextAI = normalizedCode.substring(
+            nextAIPosition,
+            nextAIPosition + nextItem.ai.length,
+          );
+
+          if (nextAI !== nextItem.ai) {
+            return false;
+          }
+        }
+      }
+
+      position = nextGSPosition + 1;
+    }
+
+    return position === normalizedCode.length;
   }
 
-  // Получение семантической карты из шаблона
+  private parseByTemplate(code: string, rawTemplate: string[]): Record<string, string> {
+    const template = this.normalizeTemplate(rawTemplate);
+    const result: Record<string, string> = {};
+
+    let position = 0;
+
+    for (const item of template) {
+      if (!item.ai) {
+        continue;
+      }
+
+      const ai = item.ai;
+
+      const actualAI = code.substring(position, position + ai.length);
+
+      if (actualAI !== ai) {
+        throw new BadRequestException(
+          `Ошибка разбора GS1: ожидался AI ${ai} ` + `на позиции ${position}, найден ${actualAI}`,
+        );
+      }
+
+      position += ai.length;
+
+      if (this.isFixedLength(ai)) {
+        const fixedLength = FIXED_LENGTH_AI[ai];
+
+        if (position + fixedLength > code.length) {
+          throw new BadRequestException(`Ошибка разбора GS1: недостаточно данных для AI ${ai}`);
+        }
+
+        result[ai] = code.substring(position, position + fixedLength);
+
+        position += fixedLength;
+        continue;
+      }
+
+      const nextGSPosition = code.indexOf(this.GS, position);
+
+      if (nextGSPosition === -1) {
+        result[ai] = code.substring(position);
+        position = code.length;
+      } else {
+        result[ai] = code.substring(position, nextGSPosition);
+
+        position = nextGSPosition + 1;
+      }
+    }
+
+    return result;
+  }
+
+  private validateAgainstTask(
+    parsedData: Record<string, string>,
+    rawTemplate: string[],
+    activeTask: ActiveTaskEntity,
+  ): void {
+    const semanticMap = this.getSemanticMap(rawTemplate);
+
+    this.validateGtin(parsedData, semanticMap, activeTask);
+
+    this.validateDate(
+      parsedData,
+      semanticMap,
+      'production_date',
+      activeTask.dateManufacture,
+      'Дата производства',
+    );
+
+    this.validateDate(
+      parsedData,
+      semanticMap,
+      'expiration_date',
+      activeTask.dateExpiration,
+      'Срок годности',
+    );
+
+    this.validateBatch(parsedData, semanticMap, activeTask.batch);
+  }
+
+  private validateGtin(
+    parsedData: Record<string, string>,
+    semanticMap: Record<string, string>,
+    activeTask: ActiveTaskEntity,
+  ): void {
+    let gtin: string | undefined;
+
+    for (const [ai, value] of Object.entries(parsedData)) {
+      const semantic = semanticMap[ai];
+
+      if (semantic === 'gtin' || semantic === 'itf14') {
+        gtin = value;
+        break;
+      }
+    }
+
+    if (!gtin) {
+      gtin = parsedData['01'] || parsedData['02'];
+      // TODO || parsedData['03'] || parsedData['04'];
+      // для этикеток большой коробки и палеты
+    }
+
+    if (!gtin) {
+      throw new BadRequestException('В этикетке отсутствует GTIN/ITF14');
+    }
+
+    const expectedGtin = activeTask.gtin || activeTask.ITF14;
+
+    if (!expectedGtin) {
+      throw new BadRequestException('В активном задании не указан GTIN/ITF14');
+    }
+
+    if (gtin !== expectedGtin) {
+      throw new BadRequestException(
+        `GTIN/ITF14 этикетки не совпадает с заданием: ` +
+          `ожидался ${expectedGtin}, получен ${gtin}`,
+      );
+    }
+  }
+
+  private validateDate(
+    parsedData: Record<string, string>,
+    semanticMap: Record<string, string>,
+    semantic: string,
+    expectedDate: string,
+    fieldName: string,
+  ): void {
+    let valueFromLabel: string | undefined;
+
+    for (const [ai, value] of Object.entries(parsedData)) {
+      if (semanticMap[ai] === semantic) {
+        valueFromLabel = value;
+        break;
+      }
+    }
+
+    if (!valueFromLabel) {
+      return;
+    }
+
+    const expectedValue = this.formatDateForLabel(expectedDate);
+
+    if (valueFromLabel !== expectedValue) {
+      throw new BadRequestException(
+        `${fieldName} этикетки не совпадает с заданием: ` +
+          `ожидалось ${expectedValue}, получено ${valueFromLabel}`,
+      );
+    }
+  }
+
+  private validateBatch(
+    parsedData: Record<string, string>,
+    semanticMap: Record<string, string>,
+    expectedBatch: string,
+  ): void {
+    let batchFromLabel: string | undefined;
+
+    for (const [ai, value] of Object.entries(parsedData)) {
+      const semantic = semanticMap[ai];
+
+      if (semantic === 'batch' || semantic === 'lot') {
+        batchFromLabel = value;
+        break;
+      }
+    }
+
+    if (!batchFromLabel) {
+      batchFromLabel = parsedData['10'];
+    }
+
+    if (!batchFromLabel || !expectedBatch) {
+      return;
+    }
+
+    if (!this.compareBatchValue(batchFromLabel, expectedBatch)) {
+      throw new BadRequestException(
+        `Партия этикетки не совпадает с заданием: ` +
+          `ожидалась ${expectedBatch}, получена ${batchFromLabel}`,
+      );
+    }
+  }
+
   private getSemanticMap(rawTemplate: string[]): Record<string, string> {
     const template = this.normalizeTemplate(rawTemplate);
+
     const semanticMap: Record<string, string> = {};
 
     for (const item of template) {
@@ -185,424 +364,66 @@ export class Gs1ParserService {
     return semanticMap;
   }
 
-  // Вспомогательные методы для форматирования вывода
-  private formatParsedData(data: Record<string, string>): string {
-    return (
-      '\n' +
-      Object.entries(data)
-        .map(([key, value]) => `  ${key}: ${value}`)
-        .join('\n')
-    );
-  }
-
-  // Обновленный метод getContainerNumber
-  async getContainerNumber(code: string): Promise<{
-    type: SearchFrom;
-    containerNumber: string | null;
-    isValid?: boolean;
-    validationMessage?: string;
-  }> {
-    console.log('\n=== Получение номера тары ===');
-    console.log(`Код: ${this.escapeString(code)}`);
-
-    try {
-      // 1. Проверка на код продукта
-      if (this.isProductCode(code)) {
-        console.log('✅ Это код продукта, номер тары не требуется');
-        return { type: SearchFrom.Code, containerNumber: null };
-      }
-
-      const templates = this.templateService.getAll();
-
-      const boxTemplate = templates.find((t) => t.type === TemplateTypes.Box);
-      const palletTemplate = templates.find((t) => t.type === TemplateTypes.Pallet);
-
-      // 2. Проверяем коробку
-      if (boxTemplate) {
-        const validation = this.validateAgainstTemplate(code, boxTemplate.template);
-        if (validation.isValid) {
-          console.log('✅ Определена как коробка');
-          const parsed = this.parseByTemplate(code, boxTemplate.template);
-          const semantic = this.getSemanticMap(boxTemplate.template);
-
-          // Валидация соответствия заданию
-          const taskValidation = this.validateAgainstTask(parsed, semantic, SearchFrom.Box);
-          if (!taskValidation.isValid) {
-            console.log(`❌ Коробка не соответствует заданию: ${taskValidation.message}`);
-            return {
-              type: SearchFrom.Box,
-              containerNumber: null,
-              isValid: false,
-              validationMessage: taskValidation.message,
-            };
-          }
-
-          const containerNumber = this.extractContainerNumber(parsed);
-          console.log(`📦 Номер коробки: ${containerNumber}`);
-          return {
-            type: SearchFrom.Box,
-            containerNumber,
-            isValid: true,
-          };
-        }
-      }
-
-      // 3. Проверяем паллету
-      if (palletTemplate) {
-        const validation = this.validateAgainstTemplate(code, palletTemplate.template);
-        if (validation.isValid) {
-          console.log('✅ Определена как паллета');
-          const parsed = this.parseByTemplate(code, palletTemplate.template);
-          const semantic = this.getSemanticMap(palletTemplate.template);
-
-          // Валидация соответствия заданию
-          const taskValidation = this.validateAgainstTask(parsed, semantic, SearchFrom.Pallet);
-          if (!taskValidation.isValid) {
-            console.log(`❌ Паллета не соответствует заданию: ${taskValidation.message}`);
-            return {
-              type: SearchFrom.Pallet,
-              containerNumber: null,
-              isValid: false,
-              validationMessage: taskValidation.message,
-            };
-          }
-
-          const containerNumber = this.extractContainerNumber(parsed);
-          console.log(`📦 Номер паллеты: ${containerNumber}`);
-          return {
-            type: SearchFrom.Pallet,
-            containerNumber,
-            isValid: true,
-          };
-        }
-      }
-
-      // 4. Если ничего не подошло
-      console.log('❌ Неизвестный тип кода');
-      return {
-        type: SearchFrom.Unknown,
-        containerNumber: null,
-        isValid: false,
-        validationMessage: 'Неизвестный тип кода',
-      };
-    } catch (error: any) {
-      console.error('Ошибка при получении номера тары:', error);
-      return {
-        type: SearchFrom.Unknown,
-        containerNumber: null,
-        isValid: false,
-        validationMessage: error.message,
-      };
-    }
-  }
-
-  // Вспомогательный метод для извлечения номера из AI 21
-  private extractContainerNumber(parsedData: Record<string, string>): string | null {
-    // Ищем AI 21 в распарсенных данных
-    const containerNumber = parsedData['21'];
-
-    if (!containerNumber) {
-      console.log('⚠️ AI 21 не найден в распарсенных данных');
-      return null;
-    }
-
-    // Убираем возможные разделители в начале/конце
-    return containerNumber.replace(/^\x1D+|\x1D+$/g, '');
-  }
-
-  // Метод для быстрого получения только номера (если тип уже известен)
-  getContainerNumberByType(
-    code: string,
-    type: SearchFrom.Box | SearchFrom.Pallet,
-    template: Gs1Template,
-  ): string | null {
-    try {
-      const validation = this.validateAgainstTemplate(code, template.template);
-      if (!validation.isValid) {
-        console.log(`❌ Код не соответствует шаблону ${type}`);
-        return null;
-      }
-
-      const parsed = this.parseByTemplate(code, template.template);
-      const containerNumber = this.extractContainerNumber(parsed);
-
-      if (!containerNumber) {
-        console.log(`❌ Не удалось извлечь номер для ${type}`);
-        return null;
-      }
-
-      return containerNumber;
-    } catch (error) {
-      console.error(`Ошибка при извлечении номера ${type}:`, error);
-      return null;
-    }
-  }
-
-  // Валидация этикетки по шаблону
-  validateAgainstTemplate(code: string, rawTemplate: string[]): Gs1ValidationResult {
-    // Нормализуем код
-    const normalizedCode = this.normalizeGS(code);
-    const template = this.normalizeTemplate(rawTemplate);
-    let position = 0;
-
-    console.log('Нормализованный код:', this.escapeString(normalizedCode));
-
-    for (let i = 0; i < template.length; i++) {
-      const item = template[i];
-
-      // Пропускаем пустые элементы в шаблоне
-      if (!item.ai || item.ai === '') {
-        console.log(`Пропускаем пустой элемент шаблона на позиции ${i}`);
-        continue;
-      }
-
-      const ai = item.ai;
-
-      // Проверяем наличие AI на текущей позиции
-      const actualAI = normalizedCode.substr(position, ai.length);
-      if (actualAI !== ai) {
+  private normalizeTemplate(template: string[]): TemplateItem[] {
+    return template.map((item) => {
+      if (!item || item.trim() === '') {
         return {
-          isValid: false,
-          error: `Ожидался AI ${ai} на позиции ${position}, найден ${actualAI}`,
-          position,
-          expected: ai,
-          found: actualAI,
+          ai: '',
+          fullString: '',
         };
       }
-      console.log(actualAI);
-      position += ai.length;
 
-      // Обрабатываем данные для этого AI
-      if (this.isFixedLength(ai)) {
-        const fixedLength = FIXED_LENGTH_AI[ai];
+      const parts = item.trim().split(/\s+/);
 
-        if (position + fixedLength > normalizedCode.length) {
-          return {
-            isValid: false,
-            error: `Недостаточно данных для AI ${ai}. Ожидается ${fixedLength} символов`,
-            position,
-          };
-        }
-
-        position += fixedLength;
-      } else {
-        // Переменная длина - ищем разделитель в данных
-        let nextGSPos = -1;
-        for (let j = position; j < normalizedCode.length; j++) {
-          if (normalizedCode.charCodeAt(j) === 29) {
-            // ASCII 29 = \x1D
-            nextGSPos = j;
-            break;
-          }
-        }
-
-        console.log(
-          `AI ${ai}: ищем GS с позиции ${position} (начало данных), найден на ${nextGSPos}`,
-        );
-
-        if (nextGSPos === -1) {
-          // Если это последний элемент в шаблоне - можно дочитать до конца
-          if (i === template.length - 1) {
-            position = normalizedCode.length;
-          } else {
-            return {
-              isValid: false,
-              error: `Ожидался разделитель после данных AI ${ai}, но он не найден`,
-              position,
-            };
-          }
-        } else {
-          // Проверяем, что после разделителя идет следующий AI (кроме последнего)
-          if (i < template.length - 1) {
-            const nextItem = template[i + 1];
-            if (nextItem.ai) {
-              const nextAI = nextItem.ai;
-              const nextAIPos = nextGSPos + 1;
-
-              if (nextAIPos + nextAI.length > normalizedCode.length) {
-                return {
-                  isValid: false,
-                  error: `После разделителя недостаточно данных для следующего AI ${nextAI}`,
-                  position: nextAIPos,
-                };
-              }
-
-              const nextAIActual = normalizedCode.substr(nextAIPos, nextAI.length);
-
-              if (nextAIActual !== nextAI) {
-                return {
-                  isValid: false,
-                  error: `После разделителя ожидался AI ${nextAI}, но найден ${nextAIActual}`,
-                  position: nextAIPos,
-                };
-              }
-            }
-          }
-
-          // Пропускаем данные и разделитель
-          position = nextGSPos + 1;
-        }
-      }
-    }
-
-    // Проверяем, что после полного прохода шаблона не осталось данных
-    if (position !== normalizedCode.length) {
       return {
-        isValid: false,
-        error: `После шаблона остались необработанные данные. Позиция: ${position}, осталось: "${normalizedCode.substr(position)}"`,
-        position,
+        ai: parts[0],
+        semantic: parts.slice(1).join(' ') || undefined,
+        fullString: item,
       };
-    }
-
-    return { isValid: true };
+    });
   }
 
-  // Парсинг этикетки по шаблону
-  parseByTemplate(code: string, rawTemplate: string[]): Record<string, string> {
-    // Нормализуем код
-    const normalizedCode = this.normalizeGS(code);
-    const template = this.normalizeTemplate(rawTemplate);
-    const result: Record<string, string> = {};
-    let position = 0;
-
-    console.log('Парсинг кода:', this.escapeString(normalizedCode));
-    console.log(
-      'Шаблон:',
-      template.map((t) => t.fullString),
-    );
-
-    for (let i = 0; i < template.length; i++) {
-      const item = template[i];
-
-      // Пропускаем пустые элементы в шаблоне
-      if (!item.ai || item.ai === '') {
-        console.log(`Пропускаем пустой элемент шаблона на позиции ${i}`);
-        continue;
-      }
-
-      const ai = item.ai;
-      console.log(`\nПарсинг AI ${ai} (${item.semantic || ''}) на позиции ${position}`);
-
-      // Проверяем наличие AI
-      const actualAI = normalizedCode.substr(position, ai.length);
-      if (actualAI !== ai) {
-        throw new Error(`Ожидался AI ${ai} на позиции ${position}, найден ${actualAI}`);
-      }
-
-      // Пропускаем AI
-      position += ai.length;
-      console.log(`  Позиция после AI: ${position}`);
-
-      if (this.isFixedLength(ai)) {
-        // Читаем фиксированное количество символов
-        const fixedLength = FIXED_LENGTH_AI[ai];
-
-        if (position + fixedLength > normalizedCode.length) {
-          throw new Error(`Недостаточно данных для AI ${ai}. Ожидается ${fixedLength} символов`);
-        }
-
-        result[ai] = normalizedCode.substr(position, fixedLength);
-        console.log(`  Фикс. данные (${fixedLength}): ${result[ai]}`);
-        position += fixedLength;
-      } else {
-        // Переменная длина - ищем разделитель в данных
-        let nextGSPos = -1;
-        for (let j = position; j < normalizedCode.length; j++) {
-          if (normalizedCode.charCodeAt(j) === 29) {
-            nextGSPos = j;
-            break;
-          }
-        }
-
-        console.log(`  Поиск GS с позиции ${position} (начало данных), найден на ${nextGSPos}`);
-
-        if (nextGSPos === -1) {
-          // Последний элемент - читаем до конца
-          result[ai] = normalizedCode.substr(position);
-          console.log(`  Перем. данные (до конца): ${result[ai]}`);
-          position = normalizedCode.length;
-        } else {
-          // Читаем данные от position до nextGSPos
-          result[ai] = normalizedCode.substr(position, nextGSPos - position);
-          console.log(`  Перем. данные (до GS): ${result[ai]}`);
-          position = nextGSPos + 1; // Пропускаем GS
-          console.log(`  Позиция после GS: ${position}`);
-        }
-      }
-    }
-
-    console.log('\nРезультат парсинга:', result);
-    return result;
+  private isFixedLength(ai: string): boolean {
+    return ai in FIXED_LENGTH_AI;
   }
 
-  // Вспомогательный метод для нормализации GS
   private normalizeGS(code: string): string {
-    if (!code) return code;
-
-    // Проверяем, есть ли уже символ GS (ASCII 29)
-    for (let i = 0; i < code.length; i++) {
-      if (code.charCodeAt(i) === 29) {
-        console.log('Найден символ GS с кодом 29 на позиции', i);
-        return code;
-      }
+    if (!code) {
+      return code;
     }
 
-    // Заменяем строковое представление \x1D на реальный символ
-    let normalized = code;
-    if (code.includes('\\x1D')) {
-      normalized = code.replace(/\\x1D/g, String.fromCharCode(29));
-      console.log('Заменено \\x1D на символ GS');
-    } else if (code.includes('\u001D')) {
-      normalized = code.replace(/\u001D/g, String.fromCharCode(29));
-      console.log('Заменено \\u001D на символ GS');
-    }
-
-    return normalized;
+    return code.includes('\\x1D') ? code.replace(/\\x1D/g, String.fromCharCode(29)) : code;
   }
 
-  // Вспомогательный метод для экранирования при выводе
-  private escapeString(str: string): string {
-    let result = '';
-    for (let i = 0; i < str.length; i++) {
-      const code = str.charCodeAt(i);
-      if (code === 29) {
-        result += '\\x1D';
-      } else {
-        result += str[i];
-      }
-    }
-    return result;
+  private formatDateForLabel(date: string): string {
+    const [day, month, year] = date.split('.');
+
+    return `${year.slice(2)}${month}${day}`;
   }
 
-  // Метод для сравнения партии с учетом четности длины
   private compareBatchValue(valueFromLabel: string, expectedBatch: string): boolean {
-    if (!valueFromLabel || !expectedBatch) return false;
-
-    // Прямое сравнение
-    if (valueFromLabel === expectedBatch) return true;
-
-    const expectedLength = expectedBatch.length;
-    const isExpectedLengthEven = expectedLength % 2 === 0;
-
-    // Если длина ожидаемого значения четная - должно быть точное совпадение
-    if (isExpectedLengthEven) {
+    if (!valueFromLabel || !expectedBatch) {
       return false;
     }
 
-    // Для нечетной длины: пробуем добавить или убрать ведущий ноль
+    if (valueFromLabel === expectedBatch) {
+      return true;
+    }
 
-    // Вариант 1: в этикетке с ведущим нулем, в задании без
+    if (expectedBatch.length % 2 === 0) {
+      return false;
+    }
+
     if (
-      valueFromLabel.length === expectedLength + 1 &&
+      valueFromLabel.length === expectedBatch.length + 1 &&
       valueFromLabel.startsWith('0') &&
       valueFromLabel.substring(1) === expectedBatch
     ) {
       return true;
     }
 
-    // Вариант 2: в этикетке без ведущего нуля, в задании с
     if (
-      valueFromLabel.length === expectedLength - 1 &&
+      valueFromLabel.length === expectedBatch.length - 1 &&
       expectedBatch.startsWith('0') &&
       valueFromLabel === expectedBatch.substring(1)
     ) {
@@ -612,196 +433,13 @@ export class Gs1ParserService {
     return false;
   }
 
-  // Обновленный метод validateAgainstTask с учетом семантики
-  private validateAgainstTask(
-    parsedData: Record<string, string>,
-    semanticMap: Record<string, string>,
-    type: SearchFrom.Box | SearchFrom.Pallet,
-  ): { isValid: boolean; message?: string } {
-    const task = this.globalMonVar.task;
-    if (!task) {
-      return { isValid: false, message: 'Нет активного задания' };
+  private extractContainerNumber(parsedData: Record<string, string>): string | null {
+    const containerNumber = parsedData['21'];
+
+    if (!containerNumber) {
+      return null;
     }
 
-    // Форматируем даты из задания в формат этикетки (YYMMDD)
-    const formatDateForLabel = (date: string) => {
-      const [day, month, year] = date.split('.');
-      return `${year.slice(2)}${month}${day}`;
-    };
-
-    // Проверяем GTIN или ITF14 в зависимости от семантики
-    let gtinFromLabel: string | undefined;
-    let expectedGtin: string | undefined;
-    let gtinType: string = '';
-
-    // Ищем в распарсенных данных AI, у которого семантика 'gtin' или 'itf14'
-    for (const [ai, value] of Object.entries(parsedData)) {
-      const semantic = semanticMap[ai];
-
-      if (semantic === 'gtin') {
-        // Это GTIN
-        gtinFromLabel = value;
-        expectedGtin = task.gtin;
-        gtinType = 'GTIN';
-        break;
-      } else if (semantic === 'itf14') {
-        // Это ITF14
-        gtinFromLabel = value;
-        expectedGtin = task.ITF14;
-        gtinType = 'ITF14';
-        break;
-      }
-    }
-
-    // Если не нашли по семантике, пробуем найти любой AI с кодом 01 или 02
-    if (!gtinFromLabel) {
-      // Пробуем AI 01 или 02
-      const possibleGtinAi = parsedData['01'] || parsedData['02'];
-      if (possibleGtinAi) {
-        gtinFromLabel = possibleGtinAi;
-        // Пробуем определить тип по значению
-        if (task.gtin && task.gtin === possibleGtinAi) {
-          expectedGtin = task.gtin;
-          gtinType = 'GTIN';
-        } else if (task.ITF14 && task.ITF14 === possibleGtinAi) {
-          expectedGtin = task.ITF14;
-          gtinType = 'ITF14';
-        } else {
-          // Не можем определить, но продолжаем с проверкой
-          expectedGtin = task.gtin || task.ITF14;
-          gtinType = 'неопределенный тип';
-        }
-      }
-    }
-
-    if (!gtinFromLabel) {
-      return {
-        isValid: false,
-        message: `В этикетке отсутствует GTIN/ITF14 (не найден AI с семантикой 'gtin' или 'itf14')`,
-      };
-    }
-
-    if (gtinFromLabel !== expectedGtin) {
-      return {
-        isValid: false,
-        message: `${gtinType} не совпадает. Ожидалось: ${expectedGtin}, получено: ${gtinFromLabel}`,
-      };
-    }
-
-    // Проверяем дату производства (AI 11) - по семантике
-    let prodDateFromLabel: string | undefined;
-    for (const [ai, value] of Object.entries(parsedData)) {
-      const semantic = semanticMap[ai];
-      if (semantic === 'production_date') {
-        prodDateFromLabel = value;
-        break;
-      }
-    }
-
-    if (prodDateFromLabel) {
-      const expectedProdDate = formatDateForLabel(task.date_manufacture);
-      if (prodDateFromLabel !== expectedProdDate) {
-        return {
-          isValid: false,
-          message: `Дата производства не совпадает. Ожидалось: ${expectedProdDate}, получено: ${prodDateFromLabel}`,
-        };
-      }
-    } else if (parsedData['11']) {
-      // Fallback на AI 11
-      const expectedProdDate = formatDateForLabel(task.date_manufacture);
-      if (parsedData['11'] !== expectedProdDate) {
-        return {
-          isValid: false,
-          message: `Дата производства не совпадает. Ожидалось: ${expectedProdDate}, получено: ${parsedData['11']}`,
-        };
-      }
-    }
-
-    // Проверяем срок годности (AI 17) - по семантике
-    let expDateFromLabel: string | undefined;
-    for (const [ai, value] of Object.entries(parsedData)) {
-      const semantic = semanticMap[ai];
-      if (semantic === 'expiration_date') {
-        expDateFromLabel = value;
-        break;
-      }
-    }
-
-    if (expDateFromLabel) {
-      const expectedExpDate = formatDateForLabel(task.date_expiration);
-      if (expDateFromLabel !== expectedExpDate) {
-        return {
-          isValid: false,
-          message: `Срок годности не совпадает. Ожидалось: ${expectedExpDate}, получено: ${expDateFromLabel}`,
-        };
-      }
-    } else if (parsedData['17']) {
-      // Fallback на AI 17
-      const expectedExpDate = formatDateForLabel(task.date_expiration);
-      if (parsedData['17'] !== expectedExpDate) {
-        return {
-          isValid: false,
-          message: `Срок годности не совпадает. Ожидалось: ${expectedExpDate}, получено: ${parsedData['17']}`,
-        };
-      }
-    }
-
-    // Проверяем партию (AI 10) - по семантике
-    let batchFromLabel: string | undefined;
-    for (const [ai, value] of Object.entries(parsedData)) {
-      const semantic = semanticMap[ai];
-      if (semantic === 'batch' || semantic === 'lot') {
-        batchFromLabel = value;
-        break;
-      }
-    }
-
-    if (!batchFromLabel && parsedData['10']) {
-      batchFromLabel = parsedData['10'];
-    }
-
-    if (batchFromLabel && task.batch) {
-      if (!this.compareBatchValue(batchFromLabel, task.batch)) {
-        return {
-          isValid: false,
-          message: `Партия не совпадает. Ожидалось: ${task.batch}, получено: ${batchFromLabel}`,
-        };
-      }
-    }
-
-    return { isValid: true };
-  }
-
-  // Для отладки - вызывать только когда нужно
-  debugCodeStructure(code: string): string {
-    const parts: string[] = [];
-    let position = 0;
-
-    while (position < code.length) {
-      const ai = code.substr(position, 2);
-      parts.push(`AI:${ai}`);
-      position += 2;
-
-      if (this.isFixedLength(ai)) {
-        const length = FIXED_LENGTH_AI[ai];
-        const value = code.substr(position, length);
-        parts.push(`[${value}]`);
-        position += length;
-      } else {
-        const nextGSPos = code.indexOf(this.GS, position);
-        if (nextGSPos === -1) {
-          const value = code.substr(position);
-          parts.push(`[${value}]`);
-          position = code.length;
-        } else {
-          const value = code.substr(position, nextGSPos - position);
-          parts.push(`[${value}]`);
-          parts.push('GS');
-          position = nextGSPos + 1;
-        }
-      }
-    }
-
-    return parts.join(' ');
+    return containerNumber.replace(/^\x1D+|\x1D+$/g, '');
   }
 }

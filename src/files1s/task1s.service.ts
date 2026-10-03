@@ -17,7 +17,7 @@ import * as dotenv from 'dotenv';
 import { TaskCheckResult } from './dto/task-check-result';
 import { Repository } from 'typeorm';
 import { TaskEntity } from '../task/entities/task.entity';
-import { JsonValidationService } from './validation/json-validate.service';
+import { JsonValidationService } from '../validation/json-validate.service';
 import { TaskCodesEntity } from '../task/entities/task-codes.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import {map1sJsonToTaskEntity} from "./task-mapper.helper";
@@ -84,16 +84,6 @@ export class Task1sService implements OnModuleInit {
     const directoryPath = getJsonDirectory1S();
     const allFiles = await fs.promises.readdir(directoryPath);
     return allFiles.filter((file) => file.endsWith('.json'));
-  }
-
-  public async deleteTask(id: number) {
-    try {
-      await this.taskRepository.delete({ id });
-      return;
-    } catch (err: any) {
-      logger1S.error(`Ошибка при удалении задачи ${id}:`, err.message);
-      throw new InternalServerErrorException(err);
-    }
   }
 
   public async checkFilesInDirectory() {

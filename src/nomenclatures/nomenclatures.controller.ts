@@ -1,67 +1,36 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Param,
-  Body,
-  Res,
-} from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Post, Param, Body, ParseIntPipe } from '@nestjs/common';
+
 import { NomenclaturesService } from './nomenclatures.service';
+import { NomenclatureEntity } from './entities/nomenclature.entity';
+import { CreateNomenclatureDto } from './dto/create-nomenclature.dto';
 
 @Controller('nomenclatures')
 export class NomenclaturesController {
   constructor(private readonly nomenclaturesService: NomenclaturesService) {}
 
   @Get()
-  async getFiles(@Res() res: Response) {
-    try {
-      const files = await this.nomenclaturesService.getFiles();
-      res.json(files);
-    } catch (err) {
-      res.status(500).json({ error: 'Не удалось получить список файлов' });
-    }
+  async getAllNomenclatures(): Promise<NomenclatureEntity[]> {
+    return await this.nomenclaturesService.getAllNomenclatures();
   }
 
-  @Get(':filename')
-  async getFile(@Param('filename') filename: string, @Res() res: Response) {
-    try {
-      const data = await this.nomenclaturesService.getFile(filename);
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: 'Не удалось прочитать файл' });
-    }
+  @Get(':id')
+  async getNomenclatureById(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<NomenclatureEntity | null> {
+    return await this.nomenclaturesService.getNomenclatureById(id);
   }
 
-  @Delete(':filename')
-  async deleteFile(@Param('filename') filename: string, @Res() res: Response) {
-    try {
-      await this.nomenclaturesService.deleteFile(filename);
-      res.json({ message: 'Файл успешно удален' });
-    } catch (err) {
-      if (err.code === 'ENOENT') {
-        res.status(404).json({ error: 'Файл не найден' });
-      } else {
-        res.status(500).json({ error: 'Не удалось удалить файл' });
-      }
-    }
+  @Post()
+  async createNomenclature(@Body() data: CreateNomenclatureDto): Promise<NomenclatureEntity> {
+    return await this.nomenclaturesService.createNomenclature(data);
   }
 
-  @Post('create')
-  async createFile(@Body() body, @Res() res: Response) {
-    const { rootName, data } = body;
-    try {
-      const jsonFilePath = await this.nomenclaturesService.createFile(
-        rootName,
-        data,
-      );
-      res.json({
-        message: 'JSON file created successfully',
-        path: jsonFilePath,
-      });
-    } catch (err) {
-      res.status(500).json({ error: 'Error creating JSON file' });
-    }
+  @Post(':id')
+  async deleteNomenclature(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
+    await this.nomenclaturesService.deleteNomenclature(id);
+
+    return {
+      message: 'Номенклатура успешно удалена',
+    };
   }
 }

@@ -1,11 +1,5 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    OneToMany,
-} from 'typeorm';
-import {TaskCodesEntity} from './task-codes.entity';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from 'typeorm';
+import { TaskCodesEntity } from './task-codes.entity';
 import { PackagingEntity } from '../../aggregation/entities/packaging.entity';
 import { ActiveTaskEntity } from '../../aggregation/entities/active-task.entity';
 
@@ -23,11 +17,14 @@ export class TaskEntity {
   @Column({ name: 'itf_14', type: 'varchar', length: 14, nullable: true })
   ITF14: string;
 
-  @Column({ name: 'label_box', type: 'varchar', nullable: true })
-  labelBox: string;
+  @Column({ name: 'small_box_lable', type: 'varchar', nullable: true })
+  smallBoxLabel: string;
 
-  @Column({ name: 'label_pallet', type: 'varchar', nullable: true })
-  labelPallet: string;
+  @Column({ name: 'big_box_lable', type: 'varchar', nullable: true })
+  bigBoxLabel: string;
+
+  @Column({ name: 'pallet_label', type: 'varchar', nullable: true })
+  palletLabel: string;
 
   @Column({ name: 'inscription_label', type: 'varchar', nullable: true })
   inscriptionLabel: string;
@@ -87,10 +84,10 @@ export class TaskEntity {
   packer: string;
 
   @Column({ name: 'date_manufacture', type: 'varchar', nullable: true })
-  date_manufacture: string;
+  dateManufacture: string;
 
   @Column({ name: 'date_expiration', type: 'varchar', nullable: true })
-  date_expiration: string;
+  dateExpiration: string;
 
   @Column({ name: 'pieces_per_small_box', type: 'int', nullable: true })
   piecesPerSmallBox: number;

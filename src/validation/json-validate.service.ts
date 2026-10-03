@@ -1,14 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger1S } from '../../logger-winston/winston.config';
+import { logger1S } from '../logger-winston/winston.config';
 import { CodeValidationService } from './code-validation.service';
-import {
-  getJsonDirectory1STemplate,
-  getTemplateDirectory,
-} from '../../path.utils';
-import { TASK } from './sample';
+import { getJsonDirectory1STemplate, getTemplateDirectory } from '../path.utils';
+import { TASK } from '../files1s/sample';
 import { Injectable } from '@nestjs/common';
-import { TaskValidationResult } from '../dto/task-validation-dto';
+import { TaskValidationResult } from '../files1s/dto/task-validation-dto';
 
 @Injectable()
 export class JsonValidationService {
@@ -23,8 +20,8 @@ export class JsonValidationService {
     let templateFields: string[] = [];
 
     try {
-      const templateFiles = (await fs.promises.readdir(templateDir)).filter(
-        (f) => f.endsWith('.json'),
+      const templateFiles = (await fs.promises.readdir(templateDir)).filter((f) =>
+        f.endsWith('.json'),
       );
 
       if (templateFiles.length === 0) {
@@ -53,19 +50,14 @@ export class JsonValidationService {
         };
       }
     } catch (err: any) {
-      logger1S.error(
-        '[VALIDATION] Ошибка загрузки шаблона:',
-        err.message ?? err,
-      );
+      logger1S.error('[VALIDATION] Ошибка загрузки шаблона:', err.message ?? err);
       return {
         errors: ['Ошибка загрузки шаблона'],
         items: ['Ошибка загрузки шаблона'],
       };
     }
 
-    const activeFields = TASK.filter((field) =>
-      templateFields.includes(field.name),
-    );
+    const activeFields = TASK.filter((field) => templateFields.includes(field.name));
 
     // 3. Проверяем наличие всех полей из шаблона в JSON
     for (const fieldName of templateFields) {
@@ -82,21 +74,13 @@ export class JsonValidationService {
       const value = jsonData[field.name];
 
       // Пропускаем если поле не в шаблоне или разрешен пробел
-      if (
-        !templateFields.includes(field.name) ||
-        (field.allowSpace && value === ' ')
-      ) {
+      if (!templateFields.includes(field.name) || (field.allowSpace && value === ' ')) {
         continue;
       }
 
       // Проверка обязательных полей
       if (field.required) {
-        if (
-          value === undefined ||
-          value === null ||
-          value === '' ||
-          value === ' '
-        ) {
+        if (value === undefined || value === null || value === '' || value === ' ') {
           errors.push(`Обязательное поле ${field.label} не может быть пустым`);
           items.push(field.name);
           continue;
@@ -145,10 +129,7 @@ export class JsonValidationService {
             const shouldFilter = process.env.CODE_FILTER_ENABLED === 'true';
 
             const codeValidation = shouldFilter
-              ? await this.codeValidationService.cleanAndFilterCodes(
-                  value,
-                  jsonData.gtin,
-                )
+              ? await this.codeValidationService.cleanAndFilterCodes(value, jsonData.gtin)
               : await this.codeValidationService.validate(value, jsonData.gtin);
 
             if (codeValidation.errors.length > 0) {
@@ -160,19 +141,18 @@ export class JsonValidationService {
               codes = codeValidation.codes;
             }
           } catch (err: any) {
-            logger1S.error(
-              '[VALIDATION] Ошибка при валидации кодов:',
-              err.message,
-            );
+            logger1S.error('[VALIDATION] Ошибка при валидации кодов:', err.message);
             errors.push('Ошибка валидации кодов');
             items.push(field.name);
           }
           break;
         }
-        case 'labelBox':
-        case 'labelPallet':
+        case 'small_box_lable':
+        case 'big_box_lable':
+        case 'pallet_lable':
           const templateDirectory = getTemplateDirectory();
-          const templateFilePath = `${templateDirectory}/${value}.prn`;
+          const templateFilePath = path.join(templateDirectory, `${value}.prn`);
+
           try {
             await fs.promises.access(templateFilePath);
           } catch {

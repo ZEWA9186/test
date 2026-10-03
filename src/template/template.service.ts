@@ -26,7 +26,7 @@ export class TemplateService {
         this.loaded[t.type] = true;
       });
       this.logger.info(`Шаблоны: Инициализация ----!`);
-    } catch (err) {
+    } catch (err : any) {
       this.logger.error(`Шаблоны:Ошибка инициализации ${err.message}`);
     }
   }
@@ -38,25 +38,11 @@ export class TemplateService {
       const template = await this.templatesRepository.findOneByType(type);
       this.templates[type] = template?.template || null;
       this.loaded[type] = true;
-    } catch (err) {
+    } catch (err : any) {
       this.logger.error(`Шаблоны: Ошибка загрузки ${type}: ${err.message}`);
     } finally {
       this.isLoading = false;
     }
-  }
-
-  getBoxTemplate(): string[] | null {
-    if (!this.loaded[TemplateTypes.Box]) {
-      this.loadTemplate(TemplateTypes.Box);
-    }
-    return this.templates[TemplateTypes.Box] || null;
-  }
-
-  getPalletTemplate(): string[] | null {
-    if (!this.loaded[TemplateTypes.Pallet]) {
-      this.loadTemplate(TemplateTypes.Pallet);
-    }
-    return this.templates[TemplateTypes.Pallet] || null;
   }
 
   async saveTemplate(data: TemplateRequest): Promise<any> {
@@ -72,25 +58,34 @@ export class TemplateService {
       this.templates[data.type] = data.template;
       this.loaded[data.type] = true;
       return result;
-    } catch (err) {
+    } catch (err : any) {
       this.logger.error(`Шаблоны: ошибка сохранения ${err.message}`);
       throw err;
     }
   }
 
   getAll(): any[] {
-    if (!this.loaded[TemplateTypes.Box]) {
-      this.loadTemplate(TemplateTypes.Box);
+    if (!this.loaded[TemplateTypes.SmallBox]) {
+      this.loadTemplate(TemplateTypes.SmallBox);
+    }
+    if (!this.loaded[TemplateTypes.BigBox]) {
+      this.loadTemplate(TemplateTypes.BigBox);
     }
     if (!this.loaded[TemplateTypes.Pallet]) {
       this.loadTemplate(TemplateTypes.Pallet);
     }
 
+
     const result = [];
-    if (this.templates[TemplateTypes.Box] !== undefined) {
+    if (this.templates[TemplateTypes.SmallBox] !== undefined) {
       result.push({
-        type: TemplateTypes.Box,
-        template: this.templates[TemplateTypes.Box],
+        type: TemplateTypes.SmallBox,
+        template: this.templates[TemplateTypes.SmallBox],
+      });
+    }if (this.templates[TemplateTypes.BigBox] !== undefined) {
+      result.push({
+        type: TemplateTypes.BigBox,
+        template: this.templates[TemplateTypes.BigBox],
       });
     }
     if (this.templates[TemplateTypes.Pallet] !== undefined) {

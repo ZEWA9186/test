@@ -4,11 +4,9 @@ import { TrialEntity } from './entities/trial.entity';
 import { TrialService } from './trial.service';
 import { TrialHeaderMiddleware } from './trial-header.middleware';
 
-// import {TrialController} from "./trial.controller";
 
 @Module({
   imports: [TypeOrmModule.forFeature([TrialEntity])],
-  // controllers: [TrialController],
   providers: [TrialService, TrialHeaderMiddleware],
   exports: [TrialService],
 })

@@ -27,15 +27,21 @@ export const TASK: IDefaultTask[] = [
     allowSpace: true,
   },
   {
-    name: 'labelBox',
-    label: 'Название шаблона этикетка',
-    comment: 'Название шаблона этикетка.',
+    name: 'small_box_lable',
+    label: 'Название шаблона этикетки малого короба',
+    comment: 'Название шаблона этикетки малого короба.',
     required: true,
   },
   {
-    name: 'labelPallet',
-    label: 'Название шаблона паллеты',
-    comment: 'Название шаблона Паллеты',
+    name: 'big_box_lable',
+    label: 'Название шаблона этикетки большого короба',
+    comment: 'Название шаблона этикетки большого короба.',
+    required: true,
+  },
+  {
+    name: 'pallet_lable',
+    label: 'Название шаблона этикетки паллеты',
+    comment: 'Название шаблона этикетки паллеты.',
     required: true,
   },
   {
@@ -166,7 +172,7 @@ export const TASK: IDefaultTask[] = [
     name: 'pieces_per_pallet',
     label: 'Количество в палете',
     comment: '',
-    required: true
+    required: true,
   },
   {
     name: 'aggregation_lvl',

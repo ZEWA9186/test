@@ -1,4 +1,4 @@
-import { TemplateTypes } from 'src/globalTypes';
+import { TemplateTypes } from '../globalTypes';
 
 export interface TemplateRequest {
   template: string[];

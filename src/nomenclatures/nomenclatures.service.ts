@@ -1,77 +1,40 @@
-import { Inject, Injectable } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
-import { nomenclaturesLogger } from 'src/logger-winston/winston.config';
-import { getNomenclatureJsonDirectory } from 'src/path.util';
-import { Logger } from 'winston';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-@Injectable() 
+import { NomenclatureEntity } from './entities/nomenclature.entity';
+import { CreateNomenclatureDto } from './dto/create-nomenclature.dto';
+
+@Injectable()
 export class NomenclaturesService {
   constructor(
-    @Inject('winston') private readonly logger: Logger = nomenclaturesLogger,
+    @InjectRepository(NomenclatureEntity)
+    private readonly nomenclatureRepository: Repository<NomenclatureEntity>,
   ) {}
 
-  private readonly nomenclatureJsonDirectory = getNomenclatureJsonDirectory();
+  async getAllNomenclatures(): Promise<NomenclatureEntity[]> {
+    return await this.nomenclatureRepository.find();
+  }
 
-  async getFiles(): Promise<string[]> {
-    this.logger.info('Номенклатура: Получение списка файлов');
-    return new Promise((resolve, reject) => {
-      fs.readdir(this.nomenclatureJsonDirectory, (err, files) => {
-        if (err) {
-          this.logger.error('Номенклатура: Ошибка при чтении директории:', err);
-          return reject(err);
-        }
-        this.logger.info('Номенклатура: Список файлов успешно получен');
-        resolve(files);
-      });
+  async getNomenclatureById(id: number): Promise<NomenclatureEntity | null> {
+    return await this.nomenclatureRepository.findOne({
+      where: { id },
     });
   }
 
-  async getFile(filename: string): Promise<string> {
-    const filePath = path.join(this.nomenclatureJsonDirectory, filename);
-    this.logger.info(`Номенклатура: Получение файла: ${filename}`);
-    return new Promise((resolve, reject) => {
-      fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) {
-          this.logger.error('Номенклатура: Ошибка при чтении файла:', err);
-          return reject(err);
-        }
-        this.logger.info(`Номенклатура: Файл ${filename} успешно получен`);
-        resolve(data);
-      });
-    });
+  async createNomenclature(data: CreateNomenclatureDto): Promise<NomenclatureEntity> {
+    const nomenclature = this.nomenclatureRepository.create(data);
+
+    return await this.nomenclatureRepository.save(nomenclature);
   }
 
-  async deleteFile(filename: string): Promise<void> {
-    const filePath = path.join(this.nomenclatureJsonDirectory, filename);
-    this.logger.info(`Номенклатура: Удаление файла: ${filename}`);
-    return new Promise((resolve, reject) => {
-      fs.unlink(filePath, (err) => {
-        if (err) {
-          this.logger.error('Номенклатура: Ошибка при удалении файла:', err);
-          return reject(err);
-        }
-        this.logger.info(`Номенклатура: Файл ${filename} успешно удален`);
-        resolve();
-      });
-    });
-  }
+  async deleteNomenclature(id: number): Promise<void> {
+    const nomenclature = await this.getNomenclatureById(id);
 
-  async createFile(rootName: string, data: any): Promise<string> {
-    const jsonFilePath = path.join(
-      this.nomenclatureJsonDirectory,
-      `${rootName}.json`,
-    );
-    this.logger.info(`Номенклатура: Создание файла: ${rootName}.json`);
-    return new Promise((resolve, reject) => {
-      fs.writeFile(jsonFilePath, JSON.stringify(data, null, 2), (err) => {
-        if (err) {
-          this.logger.error('Номенклатура: Ошибка при создании файла:', err);
-          return reject(err);
-        }
-        this.logger.info(`Номенклатура: Файл ${rootName}.json успешно создан`);
-        resolve(jsonFilePath);
-      });
-    });
+    if (!nomenclature) {
+      throw new NotFoundException(`Номенклатура с ID ${id} не найдена`);
+    }
+
+    await this.nomenclatureRepository.remove(nomenclature);
   }
 }

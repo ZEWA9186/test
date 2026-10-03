@@ -181,6 +181,8 @@ export class PrinterService implements OnModuleDestroy {
       if (template) {
         boxTemplate = template.find((el: any) => el.type === 'box')?.template || [];
       }
+      // TODO Исправить поведения енама шаблона этикетки
+      // TODO Сквозная нумерация на печать или привязку при агрегации
 
       const printerName3 = process.env.PRINTER_NAME_3 || '';
       const printerName2 = process.env.PRINTER_NAME_2 || '';
