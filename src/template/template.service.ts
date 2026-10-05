@@ -65,33 +65,33 @@ export class TemplateService {
   }
 
   getAll(): any[] {
-    if (!this.loaded[TemplateTypes.SmallBox]) {
-      this.loadTemplate(TemplateTypes.SmallBox);
+    if (!this.loaded[TemplateTypes.smallBox]) {
+      this.loadTemplate(TemplateTypes.smallBox);
     }
-    if (!this.loaded[TemplateTypes.BigBox]) {
-      this.loadTemplate(TemplateTypes.BigBox);
+    if (!this.loaded[TemplateTypes.bigBox]) {
+      this.loadTemplate(TemplateTypes.bigBox);
     }
-    if (!this.loaded[TemplateTypes.Pallet]) {
-      this.loadTemplate(TemplateTypes.Pallet);
+    if (!this.loaded[TemplateTypes.pallet]) {
+      this.loadTemplate(TemplateTypes.pallet);
     }
 
 
     const result = [];
-    if (this.templates[TemplateTypes.SmallBox] !== undefined) {
+    if (this.templates[TemplateTypes.smallBox] !== undefined) {
       result.push({
-        type: TemplateTypes.SmallBox,
-        template: this.templates[TemplateTypes.SmallBox],
+        type: TemplateTypes.smallBox,
+        template: this.templates[TemplateTypes.smallBox],
       });
-    }if (this.templates[TemplateTypes.BigBox] !== undefined) {
+    }if (this.templates[TemplateTypes.bigBox] !== undefined) {
       result.push({
-        type: TemplateTypes.BigBox,
-        template: this.templates[TemplateTypes.BigBox],
+        type: TemplateTypes.bigBox,
+        template: this.templates[TemplateTypes.bigBox],
       });
     }
-    if (this.templates[TemplateTypes.Pallet] !== undefined) {
+    if (this.templates[TemplateTypes.pallet] !== undefined) {
       result.push({
-        type: TemplateTypes.Pallet,
-        template: this.templates[TemplateTypes.Pallet],
+        type: TemplateTypes.pallet,
+        template: this.templates[TemplateTypes.pallet],
       });
     }
     return result;

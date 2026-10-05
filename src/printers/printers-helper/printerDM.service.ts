@@ -1,15 +1,15 @@
 import { Injectable, Inject } from '@nestjs/common';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { PrinterService } from '../printer.service';
 import { Logger } from 'winston';
 import { printerLogger } from '../../logger-winston/winston.config';
 import { getTemplateDirectory } from '../../path.utils';
+import { PrinterQueueService } from './printer-queue.service';
 
 @Injectable()
 export class PrinterDMService {
   constructor(
-    private readonly printerService: PrinterService,
+    private readonly printerQueue: PrinterQueueService ,
     @Inject('winston') private readonly logger: Logger = printerLogger,
   ) {}
 
@@ -31,7 +31,7 @@ export class PrinterDMService {
         .filter((line) => line.length > 0)
         .map((command) => command.replace('<GS1>', `$1${sanitizedCode}`));
 
-      await this.printerService.addToPrintQueue(commands, 'большого кода');
+      await this.printerQueue.addToPrintQueue(commands, 'большого кода');
     } catch (err: any) {
       this.logger.error(`[PRINTER] Ошибка печати большого кода: ${err.message || err}`);
     }
@@ -55,7 +55,7 @@ export class PrinterDMService {
         .filter((line) => line.length > 0)
         .map((command) => command.replace('<GS1>', `$1${sanitizedCode}`));
 
-      await this.printerService.addToPrintQueue(commands, 'кода');
+      await this.printerQueue.addToPrintQueue(commands, 'кода');
     } catch (err: any) {
       this.logger.error(`[PRINTER] Ошибка печати кода: ${err.message || err}`);
     }
@@ -65,7 +65,7 @@ export class PrinterDMService {
     this.logger.info('[PRINTER] Печать пустой этикетки');
 
     try {
-      await this.printerService.addToPrintQueue(
+      await this.printerQueue.addToPrintQueue(
         [
           'SIZE 18.7 mm, 20.1 mm',
           'GAP 3 mm, 0 mm',

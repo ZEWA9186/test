@@ -51,9 +51,9 @@ export interface IMonitoringVariables {
 }
 
 export enum TemplateTypes {
-  SmallBox,
-  BigBox,
-  Pallet,
+  smallBox = 'smallBox',
+  bigBox = 'bigBox',
+  pallet = 'pallet',
 }
 
 export enum AppGatewayNames {

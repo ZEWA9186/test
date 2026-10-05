@@ -26,6 +26,11 @@ export class PrinterController {
     );
   }
 
+  @Post('print-DM')
+  async printDM(@Body('taskId') taskId: number) {
+    await this.printerService.printAllDM(taskId);
+  }
+
   @Get(':label')
   async getConfig(@Param('label') label: PrinterLabels): Promise<any> {
     try {

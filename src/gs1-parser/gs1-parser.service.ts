@@ -34,15 +34,15 @@ export class Gs1ParserService {
 
     const templateTypes = [
       {
-        type: TemplateTypes.SmallBox,
+        type: TemplateTypes.smallBox,
         scanType: ExpectedScanType.SMALL_BOX_LABEL,
       },
       {
-        type: TemplateTypes.BigBox,
+        type: TemplateTypes.bigBox,
         scanType: ExpectedScanType.BIG_BOX_LABEL,
       },
       {
-        type: TemplateTypes.Pallet,
+        type: TemplateTypes.pallet,
         scanType: ExpectedScanType.PALLET_LABEL,
       },
     ];

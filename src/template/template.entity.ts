@@ -12,6 +12,7 @@ export class Templates {
   @Column({
     type: 'enum',
     enum: TemplateTypes,
+    enumName: 'templates_type_enum',
   })
   type: TemplateTypes;
 }

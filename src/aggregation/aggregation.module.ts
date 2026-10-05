@@ -14,7 +14,8 @@ import { Gs1ParserModule } from '../gs1-parser/gs1-parser.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ActiveTaskEntity, PackagingEntity]),
-    CodeModule, Gs1ParserModule
+    CodeModule,
+    Gs1ParserModule,
   ],
   controllers: [AggregationController],
   providers: [

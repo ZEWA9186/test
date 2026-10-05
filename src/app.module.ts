@@ -1,4 +1,3 @@
-import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -10,11 +9,12 @@ import { DatabaseProviders } from './database.providers';
 import { Task1sModule } from './files1s/task1s.module';
 import { LastPackageModule } from './last-package/last-package.module';
 import { BackupModule } from './backup/backup.module';
-import {AggregationModule} from "./aggregation/aggregation.module";
-import {TaskModule} from "./task/task.module";
+import { AggregationModule } from './aggregation/aggregation.module';
+import { TaskModule } from './task/task.module';
 import { PrinterModule } from './printers/printer.module';
 import { NomenclaturesModule } from './nomenclatures/nomenclatures.module';
 import { AppGateway } from './app.gateway';
+import { Module } from '@nestjs/common';
 
 @Module({
   imports: [
@@ -32,7 +32,7 @@ import { AppGateway } from './app.gateway';
     TaskModule,
     PrinterModule,
     NomenclaturesModule,
-    AppGateway
+    AppGateway,
   ],
   controllers: [AppController],
   providers: [AppService],

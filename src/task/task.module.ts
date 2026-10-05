@@ -5,11 +5,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActiveTaskEntity } from '../aggregation/entities/active-task.entity';
 import { TaskEntity } from './entities/task.entity';
 import { ValidationModule } from '../validation/validation.module';
-import { NomenclaturesService } from '../nomenclatures/nomenclatures.service';
 import { NomenclaturesModule } from '../nomenclatures/nomenclatures.module';
+import { TaskCodesEntity } from './entities/task-codes.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TaskEntity, ActiveTaskEntity]), ValidationModule, NomenclaturesModule],
+  imports: [
+    TypeOrmModule.forFeature([TaskEntity, ActiveTaskEntity, TaskCodesEntity]),
+    ValidationModule,
+    NomenclaturesModule,
+  ],
   controllers: [TaskController],
   providers: [TaskService],
   exports: [TaskService],

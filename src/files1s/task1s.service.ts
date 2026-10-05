@@ -1,18 +1,9 @@
-import {
-  HttpException,
-  HttpStatus,
-  Injectable,
-  InternalServerErrorException,
-  OnModuleInit,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
 import { logger1S } from '../logger-winston/winston.config';
-import {
-  getJsonDirectory1S,
-  initDirectories,
-} from '../path.utils';
+import { getJsonDirectory1S, initDirectories } from '../path.utils';
 import * as dotenv from 'dotenv';
 import { TaskCheckResult } from './dto/task-check-result';
 import { Repository } from 'typeorm';
@@ -20,7 +11,7 @@ import { TaskEntity } from '../task/entities/task.entity';
 import { JsonValidationService } from '../validation/json-validate.service';
 import { TaskCodesEntity } from '../task/entities/task-codes.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import {map1sJsonToTaskEntity} from "./task-mapper.helper";
+import { map1sJsonToTaskEntity } from './task-mapper.helper';
 
 dotenv.config();
 const interval = Number(process.env.CHECK_1S_INTERVAL) || 60000;
@@ -44,20 +35,15 @@ export class Task1sService implements OnModuleInit {
     @InjectRepository(TaskEntity)
     private readonly taskRepository: Repository<TaskEntity>,
     private readonly jsonValidationService: JsonValidationService,
-    @InjectRepository(TaskCodesEntity)
-    private readonly taskCodesEntityRepository: Repository<TaskCodesEntity>,
   ) {}
 
   async onModuleInit() {
-    await initDirectories();
+    // await initDirectories();
 
     await this.checkFilesInDirectory();
     logger1S.debug('Запуск проверки файлов от 1С...');
 
-    this.checkInterval = setInterval(
-      () => this.checkFilesInDirectory(),
-      interval,
-    );
+    this.checkInterval = setInterval(() => this.checkFilesInDirectory(), interval);
   }
 
   async onApplicationShutdown() {
@@ -104,14 +90,14 @@ export class Task1sService implements OnModuleInit {
     for (const fileIn of validInFiles) {
       result.push(await this.processSingleFile(fileIn, directoryPath));
     }
-    logger1S.info(`Время выполнения checkFilesInDirectory:`, (startTime - performance.now()).toFixed(2));
+    logger1S.info(
+      `Время выполнения checkFilesInDirectory:`,
+      (startTime - performance.now()).toFixed(2),
+    );
     return result;
   }
 
-  private async processSingleFile(
-    fileIn: string,
-    directoryPath: string,
-  ): Promise<TaskCheckResult> {
+  private async processSingleFile(fileIn: string, directoryPath: string): Promise<TaskCheckResult> {
     const jsonFileName = fileIn.replace('.in', '.json');
     const jsonFilePath = path.join(directoryPath, jsonFileName);
     const inFilePath = path.join(directoryPath, fileIn);
@@ -144,10 +130,7 @@ export class Task1sService implements OnModuleInit {
         };
       }
     } catch (error: any) {
-      logger1S.error(
-        `Ошибка при обработке файла ${fileIn}: ${error.message}`,
-        error.stack,
-      );
+      logger1S.error(`Ошибка при обработке файла ${fileIn}: ${error.message}`, error.stack);
       return {
         success: false,
         errors: error.message,
@@ -158,16 +141,14 @@ export class Task1sService implements OnModuleInit {
 
   private async processTaskPayload(jsonParsed: any): Promise<TaskCheckResult> {
     return this.enqueueTask(async () => {
-      const { codes, errors, items } =
-        await this.jsonValidationService.validateJson(jsonParsed);
+      const { codes, errors, items } = await this.jsonValidationService.validateJson(jsonParsed);
 
       if (errors.length > 0) {
         return { success: false, errors, items };
       }
 
       try {
-        const rawCodes: string[] =
-          codes && codes.length > 0 ? codes : jsonParsed.codes;
+        const rawCodes: string[] = codes && codes.length > 0 ? codes : jsonParsed.codes;
         const mappedData = map1sJsonToTaskEntity(jsonParsed, rawCodes);
         const taskEntity = this.taskRepository.create(mappedData);
 

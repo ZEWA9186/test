@@ -73,18 +73,18 @@ export class PrinterService implements OnModuleInit {
   }
 
   public async printAllDM(id: number) {
-    try{
+    try {
       const codes = await this.taskService.getCodesByTaskId(id);
-      for(const code of codes){
+      for (const code of codes) {
         await this.printerDMService.printCode(code);
-        new Promise(resolve => setTimeout(resolve, 100));
+        new Promise((resolve) => setTimeout(resolve, 100));
       }
-    } catch (err: any){
-      printerLogger.error(`Ошибка печати датаматриксов для задачи ${id}`)
+    } catch (err: any) {
+      printerLogger.error(`Ошибка печати датаматриксов для задачи ${id}`);
       throw new BadRequestException(`Ошибка печати датаматриксов для задачи ${id}`);
     }
   }
-/*  async getUserIdByBoxNumber(
+  /*  async getUserIdByBoxNumber(
     boxNumber: number,
     tableName: string,
     manager: EntityManager,
@@ -99,7 +99,7 @@ export class PrinterService implements OnModuleInit {
 
   public async printBoxLabel(boxNumber: number, countInBox: number, id: number): Promise<any> {
     try {
-      const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer3);
+      const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer2);
 
       // TODO:
       // Тип/назначение принтера сейчас определяется через PrinterLabels.
@@ -107,7 +107,7 @@ export class PrinterService implements OnModuleInit {
       // тип/назначение принтера из конфигурации БД.
 
       if (!printer) {
-        this.logger.error(`Принтер ${PrinterLabels.Printer3} не подключён`);
+        this.logger.error(`Принтер ${PrinterLabels.Printer2} не подключён`);
 
         return;
       }
@@ -117,7 +117,7 @@ export class PrinterService implements OnModuleInit {
       let boxTemplate = [];
 
       if (template) {
-        boxTemplate = template.find((el: any) => el.type === 'box')?.template || [];
+        boxTemplate = template.find((el: any) => el.type === 'smallBox')?.template || [];
       }
 
       // TODO Исправить поведение енама шаблона этикетки
