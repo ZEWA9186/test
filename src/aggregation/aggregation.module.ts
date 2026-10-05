@@ -9,11 +9,12 @@ import { AggregationRules } from './helper-service/aggregation.rules';
 import { AggregationRepository } from './repository/aggregation.repository';
 import { AggregationProductService } from './helper-service/aggregation-product.service';
 import { AggregationContainerService } from './helper-service/aggregation-container.service';
+import { Gs1ParserModule } from '../gs1-parser/gs1-parser.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ActiveTaskEntity, PackagingEntity]),
-    CodeModule,
+    CodeModule, Gs1ParserModule
   ],
   controllers: [AggregationController],
   providers: [

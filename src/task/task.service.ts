@@ -8,6 +8,7 @@ import { TaskEntity } from './entities/task.entity';
 import { ActiveTaskEntity } from '../aggregation/entities/active-task.entity';
 import { CodeValidationService } from '../validation/code-validation.service';
 import { NomenclaturesService } from '../nomenclatures/nomenclatures.service';
+import { TaskCodesEntity } from './entities/task-codes.entity';
 
 @Injectable()
 export class TaskService {
@@ -18,6 +19,8 @@ export class TaskService {
     private readonly activeTaskRepository: Repository<ActiveTaskEntity>,
     private readonly codeValidationService: CodeValidationService,
     private readonly nomenclaturesService: NomenclaturesService,
+    @InjectRepository(TaskCodesEntity)
+    private readonly taskCodesRepository: Repository<TaskCodesEntity>,
   ) {}
 
   async getAllTask(): Promise<TaskEntity[]> {
@@ -28,6 +31,12 @@ export class TaskService {
     return await this.taskRepository.findOne({
       where: { id },
     });
+  }
+
+  async getCodesByTaskId(taskId: number): Promise<string[]> {
+    return (await this.taskCodesRepository.find({
+      where: { taskId },
+    })).map(code => code.code);
   }
 
   async createTask(data: any, nomenclatureId: number, numberValue?: number): Promise<TaskEntity> {

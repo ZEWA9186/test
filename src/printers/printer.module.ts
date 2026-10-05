@@ -1,26 +1,33 @@
 import { Module } from '@nestjs/common';
 import { PrinterService } from './printer.service';
-import { AppGateway } from 'src/app.gateway';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PrinterConfigRepository } from './printer-config.repository';
 import { PrinterController } from './printer.controller';
 import { PrinterConfig } from './printer-config.entity';
-import { printerLogger } from 'src/logger-winston/winston.config';
-import { TemplateModule } from 'src/template/template.module';
-import { PrinterDMService } from './printerDM.service';
-import { GatawayModule } from 'src/Gateway.module';
-import { PrinterDemacService } from './TTO/printer_demac.service';
+import { printerLogger } from '../logger-winston/winston.config';
+import { TemplateModule } from '../template/template.module';
+import { PrinterDMService } from './printers-helper/printerDM.service';
+import { PrinterConfigService } from './printers-helper/printer-config.service';
+import { PrinterConnectionService } from './printers-helper/printer-connection.service';
+import { PrinterMonitoringService } from './printers-helper/printer-monitoring.service';
+import { PrinterQueueService } from './printers-helper/printer-queue.service';
+import { TaskModule } from '../task/task.module';
+import { AppGateway } from '../app.gateway';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PrinterConfig]), TemplateModule, GatawayModule],
+  imports: [TypeOrmModule.forFeature([PrinterConfig]), TemplateModule, TaskModule],
   controllers: [PrinterController],
   providers: [
     PrinterService,
     PrinterConfigRepository,
     PrinterDMService,
-    PrinterDemacService,
     { provide: 'winston', useValue: printerLogger },
+    PrinterConfigService,
+    PrinterConnectionService,
+    PrinterMonitoringService,
+    PrinterQueueService,
+    AppGateway,
   ],
-  exports: [PrinterService, PrinterConfigRepository, PrinterDemacService],
+  exports: [PrinterService, PrinterConfigRepository],
 })
 export class PrinterModule {}

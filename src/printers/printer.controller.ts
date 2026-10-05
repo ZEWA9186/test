@@ -45,9 +45,9 @@ export class PrinterController {
 
   @Post('print-box')
   async printBox(
-    @Body() body: { boxNumber: number; countInBox: number },
+    @Body() body: { boxNumber: number; countInBox: number; taskId: number },
   ): Promise<void> {
-    await this.printerService.printBoxLabel(body.boxNumber, body.countInBox);
+    await this.printerService.printBoxLabel(body.boxNumber, body.countInBox, body.taskId);
   }
 
   @Post('print-pallet')
@@ -57,12 +57,14 @@ export class PrinterController {
       palletNumber: number;
       countInPallet: number;
       productCountInPallet: number;
+      taskId: number;
     },
   ): Promise<void> {
     await this.printerService.printPalletLabel(
       body.palletNumber,
       body.countInPallet,
       body.productCountInPallet,
+      body.taskId,
     );
   }
 }

@@ -12,6 +12,9 @@ import { LastPackageModule } from './last-package/last-package.module';
 import { BackupModule } from './backup/backup.module';
 import {AggregationModule} from "./aggregation/aggregation.module";
 import {TaskModule} from "./task/task.module";
+import { PrinterModule } from './printers/printer.module';
+import { NomenclaturesModule } from './nomenclatures/nomenclatures.module';
+import { AppGateway } from './app.gateway';
 
 @Module({
   imports: [
@@ -27,6 +30,9 @@ import {TaskModule} from "./task/task.module";
     BackupModule,
     AggregationModule,
     TaskModule,
+    PrinterModule,
+    NomenclaturesModule,
+    AppGateway
   ],
   controllers: [AppController],
   providers: [AppService],

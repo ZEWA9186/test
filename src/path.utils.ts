@@ -22,27 +22,11 @@ export const getTemplateDirectory = (): string => {
 
 export const getPostgresPath = (): string => getEnv('POSTGRES_PATH');
 
-export const getLineTaskDirectory = (lineNum: number): string => {
-  const envKey = `LINE_TASK_DIRECTORY`;
-  return path.resolve(getEnv(envKey), `${lineNum}`);
-};
-
 export const getBackupDirectories = (): string[] => {
   return getEnv('BACKUP_DIRS')
     .split(',')
     .map((d) => d.trim())
     .filter(Boolean);
-};
-
-export const getLineCount = (): number => {
-  const rawLineCount = getEnv('LINE_COUNT');
-  const lineCount = parseInt(rawLineCount, 10);
-  if (isNaN(lineCount) || lineCount <= 0) {
-    throw new Error(
-      '[CONFIG ERROR] LINE_COUNT must be a valid positive integer',
-    );
-  }
-  return lineCount;
 };
 
 export function validateEnvironment(): void {

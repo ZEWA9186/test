@@ -26,10 +26,9 @@ export async function printLabelBox(
   boxTemplate: any[],
   task: any,
   logger: Logger,
-  printerN?: any,
+  printerName: any,
 ) {
   const PCName = process.env.PC_NAME || '';
-  let printerName = printerN || '';
   console.log('===============printerName', printerName);
 
   if (!printer) {
@@ -115,9 +114,9 @@ export async function printLabelPallet(
   task: any,
   logger: Logger,
   itemsPerPallet: any,
+  printerName: any,
 ) {
   const PCName = process.env.PC_NAME || '';
-  const printerName = process.env.PRINTER_NAME_1 || '';
   if (!printer) {
     logger.warn('Принтер: Принтер не подключен');
     return;

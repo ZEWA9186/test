@@ -1,9 +1,3 @@
-export enum EventTypes {
-  CodeStatusUpdated = 'codeStatusUpdated',
-  VariablesUpdated = 'variablesUpdated',
-  ConnectionRestored = 'connectionRestored',
-}
-
 export enum MonitoringStatusActions {
   Left = 'left',
   Right = 'right',
