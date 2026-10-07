@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+
 import { PrinterService } from './printer.service';
 import { PrinterLabels, PrinterNames } from './types';
 
@@ -26,15 +27,24 @@ export class PrinterController {
     );
   }
 
+  // ============================================================
+  // DATAMATRIX
+  // ============================================================
+
   @Post('print-DM')
-  async printDM(@Body('taskId') taskId: number) {
+  async printDM(@Body('taskId') taskId: number): Promise<void> {
     await this.printerService.printAllDM(taskId);
   }
+
+  // ============================================================
+  // КОНФИГУРАЦИЯ ПРИНТЕРА
+  // ============================================================
 
   @Get(':label')
   async getConfig(@Param('label') label: PrinterLabels): Promise<any> {
     try {
       let name = PrinterNames.Printer1;
+
       if (label === PrinterLabels.Printer2) {
         name = PrinterNames.Printer2;
       } else if (label === PrinterLabels.Printer3) {
@@ -42,34 +52,105 @@ export class PrinterController {
       } else if (label === PrinterLabels.Printer4) {
         name = PrinterNames.Printer4;
       }
+
       return await this.printerService.getConfigByName(name);
     } catch (err) {
       console.log('getConfig', err);
     }
   }
 
+  // ============================================================
+  // МАЛЫЕ КОРОБКИ
+  // ============================================================
+
+  /**
+   * Печать одной этикетки малой коробки.
+   *
+   * boxNumber — номер коробки из внешнего ресурса.
+   * taskId — задача.
+   * Количество продукции берётся из task.piecesPerSmallBox.
+   */
   @Post('print-box')
   async printBox(
-    @Body() body: { boxNumber: number; countInBox: number; taskId: number },
+    @Body()
+    body: {
+      boxNumber: number;
+      taskId: number;
+    },
   ): Promise<void> {
-    await this.printerService.printBoxLabel(body.boxNumber, body.countInBox, body.taskId);
+    await this.printerService.printSmallBoxLabel(body.boxNumber, body.taskId);
   }
 
+  /**
+   * Печать всех малых коробок.
+   *
+   * Номер коробки получает PrinterService
+   * через LastPackageService.
+   */
+  @Post('print-all-box')
+  async printAllBox(@Body('taskId') taskId: number): Promise<void> {
+    await this.printerService.printAllSmallBoxLabel(taskId);
+  }
+
+  // ============================================================
+  // БОЛЬШИЕ КОРОБКИ
+  // ============================================================
+
+  /**
+   * Печать одной этикетки большой коробки.
+   *
+   * boxNumber — номер коробки из внешнего ресурса.
+   * taskId — задача.
+   * Количество продукции берётся из task.piecesPerBigBox.
+   */
+  @Post('print-big-box')
+  async printBigBox(
+    @Body()
+    body: {
+      boxNumber: number;
+      taskId: number;
+    },
+  ): Promise<void> {
+    await this.printerService.printBigBoxLabel(body.boxNumber, body.taskId);
+  }
+
+  /**
+   * Печать всех больших коробок.
+   */
+  @Post('print-all-big-box')
+  async printAllBigBox(@Body('taskId') taskId: number): Promise<void> {
+    await this.printerService.printAllBigBoxLabel(taskId);
+  }
+
+  // ============================================================
+  // ПАЛЛЕТЫ
+  // ============================================================
+
+  /**
+   * Печать одной этикетки паллеты.
+   *
+   * palletNumber — номер паллеты из внешнего ресурса.
+   * taskId — задача.
+   *
+   * Количество продукции для этикетки
+   * определяется внутри PrinterService.
+   */
   @Post('print-pallet')
   async printPallet(
     @Body()
     body: {
       palletNumber: number;
-      countInPallet: number;
-      productCountInPallet: number;
       taskId: number;
     },
   ): Promise<void> {
-    await this.printerService.printPalletLabel(
-      body.palletNumber,
-      body.countInPallet,
-      body.productCountInPallet,
-      body.taskId,
-    );
+    await this.printerService.printPalletLabel(body.palletNumber, body.taskId);
+  }
+
+  /**
+   * Печать всех паллет.
+   */
+  @Post('print-all-pallet')
+  async printAllPallet(@Body('taskId') taskId: number): Promise<void> {
+    await this.printerService.printAllPalletLabel(taskId);
   }
 }

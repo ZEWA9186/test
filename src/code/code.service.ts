@@ -22,10 +22,7 @@ export class CodeService {
     }
 
     try {
-      await this.dataSource.query(
-        'INSERT INTO "code_entity" ("code") VALUES ($1)',
-        [code],
-      );
+      await this.dataSource.query('INSERT INTO "code_entity" ("code") VALUES ($1)', [code]);
     } catch (err: any) {
       if (err?.code === '23505') {
         codeLogger.warn(`Попытка дублирования кода: ${code}`);
@@ -48,19 +45,16 @@ export class CodeService {
     }
 
     try {
-      await this.dataSource.query(
-        'INSERT INTO "code_entity" ("code") SELECT unnest($1::text[])',
-        [codes],
-      );
+      await this.dataSource.query('INSERT INTO "code_entity" ("code") SELECT unnest($1::text[])', [
+        codes,
+      ]);
     } catch (error: any) {
       if (error?.code === '23505') {
         codeLogger.warn('Один или несколько кодов уже есть в базе');
         throw new ConflictException('Один или несколько кодов уже есть в базе');
       }
 
-      codeLogger.error(
-        `Ошибка при сохранении кодов: ${error?.message || error}`,
-      );
+      codeLogger.error(`Ошибка при сохранении кодов: ${error?.message || error}`);
       throw new InternalServerErrorException('Ошибка при сохранении кодов');
     }
   }
@@ -77,19 +71,14 @@ export class CodeService {
       );
       return data.map((el) => el.code);
     } catch (error: any) {
-      codeLogger.error(
-        `Ошибка при получении кодов: ${error?.message || error}`,
-      );
+      codeLogger.error(`Ошибка при получении кодов: ${error?.message || error}`);
       throw new InternalServerErrorException('Ошибка при получении кодов');
     }
   }
 
   async deleteCode(code: string) {
     try {
-      await this.dataSource.query(
-        'DELETE FROM "code_entity" WHERE "code" = $1',
-        [code],
-      );
+      await this.dataSource.query('DELETE FROM "code_entity" WHERE "code" = $1', [code]);
       codeLogger.info('Код удалён');
     } catch (error: any) {
       codeLogger.error(error.message || error);
@@ -103,10 +92,7 @@ export class CodeService {
     }
 
     try {
-      await this.dataSource.query(
-        'DELETE FROM "code_entity" WHERE "code" = ANY($1)',
-        [codes],
-      );
+      await this.dataSource.query('DELETE FROM "code_entity" WHERE "code" = ANY($1)', [codes]);
       codeLogger.info('Коды удалены');
     } catch (error: any) {
       codeLogger.error(error.message || error);

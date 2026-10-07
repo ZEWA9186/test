@@ -13,9 +13,15 @@ import { PrinterMonitoringService } from './printers-helper/printer-monitoring.s
 import { PrinterQueueService } from './printers-helper/printer-queue.service';
 import { TaskModule } from '../task/task.module';
 import { AppGateway } from '../app.gateway';
+import { LastPackageModule } from '../last-package/last-package.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PrinterConfig]), TemplateModule, TaskModule],
+  imports: [
+    TypeOrmModule.forFeature([PrinterConfig]),
+    TemplateModule,
+    TaskModule,
+    LastPackageModule,
+  ],
   controllers: [PrinterController],
   providers: [
     PrinterService,

@@ -1,9 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/common';
 
 import { Logger } from 'winston';
-
-import { MonitoringStatusActions } from '../globalTypes';
 
 import { printLabelBox, printLabelPallet } from './printer.utils';
 
@@ -11,27 +8,24 @@ import { TemplateService } from '../template/template.service';
 import { printerLogger } from '../logger-winston/winston.config';
 
 import { PrinterLabels } from './types';
-
 import { PrinterConfig } from './printer-config.entity';
 
 import { PrinterConfigService } from './printers-helper/printer-config.service';
 import { PrinterConnectionService } from './printers-helper/printer-connection.service';
-import { PrinterQueueService } from './printers-helper/printer-queue.service';
+
 import { TaskService } from '../task/task.service';
 import { PrinterDMService } from './printers-helper/printerDM.service';
+import { LastPackageService } from '../last-package/last-package.service';
 
 @Injectable()
 export class PrinterService implements OnModuleInit {
   constructor(
     private readonly printerConfigService: PrinterConfigService,
-
     private readonly printerConnectionService: PrinterConnectionService,
-
-    private readonly printerQueueService: PrinterQueueService,
-
     private readonly templateService: TemplateService,
-    @Inject()
+
     private readonly taskService: TaskService,
+    private readonly lastPackageService: LastPackageService,
 
     @Inject('winston')
     private readonly logger: Logger = printerLogger,
@@ -59,160 +53,233 @@ export class PrinterService implements OnModuleInit {
     await this.printerConnectionService.applyConfig(config);
   }
 
-  // TODO Коннект сейчас хуй пойми как отрабатывает
   public async connectPrinter(name: string): Promise<void> {
     const config = await this.printerConfigService.findByName(name);
 
     if (!config) {
       this.logger.warn(`Принтер: конфигурация для ${name} не найдена`);
-
       return;
     }
 
     await this.printerConnectionService.connect(config);
   }
 
-  public async printAllDM(id: number) {
+  public async printAllDM(id: number): Promise<void> {
     try {
       const codes = await this.taskService.getCodesByTaskId(id);
+
       for (const code of codes) {
         await this.printerDMService.printCode(code);
-        new Promise((resolve) => setTimeout(resolve, 100));
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
-    } catch (err: any) {
-      printerLogger.error(`Ошибка печати датаматриксов для задачи ${id}`);
+    } catch (err) {
+      this.logger.error(`Ошибка печати датаматриксов для задачи ${id}`, err);
+
       throw new BadRequestException(`Ошибка печати датаматриксов для задачи ${id}`);
     }
   }
-  /*  async getUserIdByBoxNumber(
-    boxNumber: number,
-    tableName: string,
-    manager: EntityManager,
-  ): Promise<number | null> {
-    const result = await manager.query(
-      `SELECT user_id FROM "${tableName}" WHERE box_number = $1 LIMIT 1`,
-      [boxNumber],
+
+  public async printAllSmallBoxLabel(taskId: number): Promise<void> {
+    const task = await this.taskService.getTaskById(taskId);
+
+    if (!task) {
+      throw new BadRequestException(`Конфигурации для задачи ${taskId} нет`);
+    }
+
+    if (!task.piecesPerSmallBox) {
+      throw new BadRequestException('В задаче не указано количество продуктов в малой коробке');
+    }
+
+    const boxNumber = await this.lastPackageService.updateSmallBoxNumber(
+      task.gtin,
+      task.dateManufacture,
+      task.batch,
     );
 
-    return result[0]?.user_id || null;
-  }*/
-
-  public async printBoxLabel(boxNumber: number, countInBox: number, id: number): Promise<any> {
-    try {
-      const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer2);
-
-      // TODO:
-      // Тип/назначение принтера сейчас определяется через PrinterLabels.
-      // В будущем перенести эту информацию в PrinterConfig и определять
-      // тип/назначение принтера из конфигурации БД.
-
-      if (!printer) {
-        this.logger.error(`Принтер ${PrinterLabels.Printer2} не подключён`);
-
-        return;
-      }
-
-      const template = this.templateService.getAll();
-
-      let boxTemplate = [];
-
-      if (template) {
-        boxTemplate = template.find((el: any) => el.type === 'smallBox')?.template || [];
-      }
-
-      // TODO Исправить поведение енама шаблона этикетки
-      // TODO Сквозная нумерация на печать или привязку при агрегации
-      // TODO Переписать поведение принтеров
-      // TODO Подумать над процессом печати, всё сразу, частями, допечать
-
-      const printerName = process.env.PRINTER_NAME_2 || '';
-
-      //const printerName2 = process.env.PRINTER_NAME_3 || '';/
-
-      // let goTo = MonitoringStatusActions.Right;
-
-      // if (this.globalMonVar.currentBoxNumber % 2 === 0) {
-      //   goTo = this.globalMonVar.isFirstBoxOdd
-      //     ? MonitoringStatusActions.Right
-      //     : MonitoringStatusActions.Left;
-      // }
-      //
-      // const printerName = goTo === MonitoringStatusActions.Right ? printerName2 : printerName3;
-
-      const task = await this.taskService.getTaskById(id);
-
-      if (!task) {
-        throw new BadRequestException(`Конфигурации для задачи ${id} нет`);
-      }
-
-      if (boxTemplate.length) {
-        await printLabelBox(
-          boxNumber,
-          countInBox,
-          printer,
-          boxTemplate,
-          task,
-          this.logger,
-          printerName,
-        );
-      }
-    } catch (err) {
-      this.logger.error('Ошибка печати этикетки коробки:', err);
+    for (let i = 0; i < task.piecesPerSmallBox; i++) {
+      await this.printSmallBoxLabel(boxNumber, task.id);
     }
   }
 
-  public async printPalletLabel(
-    palletNumber: number,
-    countInPallet: number,
-    productCountInPallet: number,
-    id: number,
-  ): Promise<any> {
+  public async printAllBigBoxLabel(taskId: number): Promise<void> {
+    const task = await this.taskService.getTaskById(taskId);
+
+    if (!task) {
+      throw new BadRequestException(`Конфигурации для задачи ${taskId} нет`);
+    }
+
+    if (!task.piecesPerBigBox) {
+      throw new BadRequestException('В задаче не указано количество продуктов в большой коробке');
+    }
+
+    const boxNumber = await this.lastPackageService.updateBigBoxNumber(
+      task.gtin,
+      task.dateManufacture,
+      task.batch,
+    );
+
+    for (let i = 0; i < task.piecesPerBigBox; i++) {
+      await this.printBigBoxLabel(boxNumber, task.id);
+    }
+  }
+
+  public async printAllPalletLabel(taskId: number): Promise<void> {
+    const task = await this.taskService.getTaskById(taskId);
+
+    if (!task) {
+      throw new BadRequestException(`Конфигурации для задачи ${taskId} нет`);
+    }
+
+    if (!task.piecesPerPallet) {
+      throw new BadRequestException('В задаче не указано количество продуктов на паллете');
+    }
+
+    const palletNumber = await this.lastPackageService.updatePalletNumber(
+      task.gtin,
+      task.dateManufacture,
+      task.batch,
+    );
+
+    for (let i = 0; i < task.piecesPerPallet; i++) {
+      await this.printPalletLabel(palletNumber, task.id);
+    }
+  }
+
+  public async printSmallBoxLabel(boxNumber: number, taskId: number): Promise<void> {
+    const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer2);
+
+    if (!printer) {
+      this.logger.error(`Принтер ${PrinterLabels.Printer2} не подключён`);
+      return;
+    }
+
+    const task = await this.taskService.getTaskById(taskId);
+
+    if (!task) {
+      throw new BadRequestException(`Конфигурации для задачи ${taskId} нет`);
+    }
+
+    if (!task.piecesPerSmallBox) {
+      throw new BadRequestException('В задаче не указано количество продуктов в малой коробке');
+    }
+
+    const template = this.templateService.getAll();
+
+    const boxTemplate = template?.find((el: any) => el.type === 'smallBox')?.template || [];
+
+    if (!boxTemplate.length) {
+      return;
+    }
+
+    const printerName = process.env.PRINTER_NAME_2 || '';
+
+    try {
+      await printLabelBox(
+        boxNumber,
+        task.piecesPerSmallBox,
+        printer,
+        boxTemplate,
+        task,
+        this.logger,
+        printerName,
+      );
+    } catch (err) {
+      this.logger.error('Ошибка печати этикетки малой коробки:', err);
+    }
+  }
+
+  public async printBigBoxLabel(boxNumber: number, taskId: number): Promise<void> {
+    const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer2);
+
+    if (!printer) {
+      this.logger.error(`Принтер ${PrinterLabels.Printer2} не подключён`);
+      return;
+    }
+
+    const task = await this.taskService.getTaskById(taskId);
+
+    if (!task) {
+      throw new BadRequestException(`Конфигурации для задачи ${taskId} нет`);
+    }
+
+    if (!task.piecesPerBigBox) {
+      throw new BadRequestException('В задаче не указано количество продуктов в большой коробке');
+    }
+
+    const template = this.templateService.getAll();
+
+    const boxTemplate = template?.find((el: any) => el.type === 'bigBox')?.template || [];
+
+    if (!boxTemplate.length) {
+      return;
+    }
+
+    const ProductsInBigBox = await this.taskService.getProductsInBigBox(taskId);
+    //TODO Исправить генератор, добавить количество продуктов в коробке
+    const printerName = process.env.PRINTER_NAME_2 || '';
+
+    try {
+      await printLabelBox(
+        boxNumber,
+        task.piecesPerBigBox,
+        printer,
+        boxTemplate,
+        task,
+        this.logger,
+        printerName,
+      );
+    } catch (err) {
+      this.logger.error('Ошибка печати этикетки большой коробки:', err);
+    }
+  }
+
+  public async printPalletLabel(palletNumber: number, taskId: number): Promise<void> {
     try {
       const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer3);
 
       if (!printer) {
         this.logger.error(`Принтер ${PrinterLabels.Printer3} не подключён`);
-
         return;
+      }
+
+      const task = await this.taskService.getTaskById(taskId);
+
+      if (!task) {
+        throw new BadRequestException(`Конфигурации для задачи ${taskId} нет`);
+      }
+
+      if (!task.piecesPerPallet) {
+        throw new BadRequestException('В задаче не указано количество продуктов на паллете');
       }
 
       const template = this.templateService.getAll();
 
-      let palletTemplate = [];
+      const palletTemplate = template?.find((el: any) => el.type === 'pallet')?.template || [];
 
-      if (template) {
-        palletTemplate = template.find((el: any) => el.type === 'pallet')?.template || [];
+      if (!palletTemplate.length) {
+        return;
       }
 
-      const task = await this.taskService.getTaskById(id);
+      const productsInPallet = await this.taskService.getProductsInPalletId(taskId);
 
-      if (!task) {
-        throw new BadRequestException(`Конфигурации для задачи ${id} нет`);
-      }
       const printerName = process.env.PRINTER_NAME_1 || '';
 
-      if (palletTemplate.length) {
-        await printLabelPallet(
-          palletNumber,
-          countInPallet,
-          printer,
-          palletTemplate,
-          task,
-          this.logger,
-          productCountInPallet,
-          printerName,
-        );
-      }
+      await printLabelPallet(
+        palletNumber,
+        task.piecesPerPallet,
+        printer,
+        palletTemplate,
+        task,
+        this.logger,
+        productsInPallet,
+        printerName,
+      );
     } catch (err) {
       this.logger.error('Ошибка печати этикетки паллеты:', err);
     }
   }
-
   public getConnectionStatus(): boolean {
     return this.printerConnectionService.isConnected(PrinterLabels.Printer2);
-  }
-
-  public async addToPrintQueue(commands: Array<string | Buffer>, label: string): Promise<void> {
-    return this.printerQueueService.addToPrintQueue(commands, label);
   }
 }

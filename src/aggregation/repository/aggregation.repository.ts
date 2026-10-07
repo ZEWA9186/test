@@ -2,10 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 
-import {
-  ActiveTaskEntity,
-  ExpectedScanType,
-} from '../entities/active-task.entity';
+import { ActiveTaskEntity, ExpectedScanType } from '../entities/active-task.entity';
 import { PackagingEntity } from '../entities/packaging.entity';
 
 @Injectable()
@@ -33,16 +30,11 @@ export class AggregationRepository {
     return activeTask;
   }
 
-  async saveActiveTask(
-    activeTask: ActiveTaskEntity,
-  ): Promise<ActiveTaskEntity> {
+  async saveActiveTask(activeTask: ActiveTaskEntity): Promise<ActiveTaskEntity> {
     return this.activeTaskRepository.save(activeTask);
   }
 
-  async addProduct(
-    activeTask: ActiveTaskEntity,
-    code: string,
-  ): Promise<PackagingEntity> {
+  async addProduct(activeTask: ActiveTaskEntity, code: string): Promise<PackagingEntity> {
     return this.packagingRepository.save({
       code,
       tsdId: activeTask.tsdId,
@@ -89,9 +81,7 @@ export class AggregationRepository {
         });
 
       default:
-        throw new Error(
-          `Неизвестный уровень агрегации: ${activeTask.aggregationLvl}`,
-        );
+        throw new Error(`Неизвестный уровень агрегации: ${activeTask.aggregationLvl}`);
     }
   }
 
@@ -134,9 +124,7 @@ export class AggregationRepository {
       },
     });
 
-    return (
-      recordsCount / (activeTask.piecesPerSmallBox * activeTask.piecesPerBigBox)
-    );
+    return recordsCount / (activeTask.piecesPerSmallBox * activeTask.piecesPerBigBox);
   }
 
   /**

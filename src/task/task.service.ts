@@ -34,9 +34,11 @@ export class TaskService {
   }
 
   async getCodesByTaskId(taskId: number): Promise<string[]> {
-    return (await this.taskCodesRepository.find({
-      where: { taskId },
-    })).map(code => code.code);
+    return (
+      await this.taskCodesRepository.find({
+        where: { taskId },
+      })
+    ).map((code) => code.code);
   }
 
   async createTask(data: any, nomenclatureId: number, numberValue?: number): Promise<TaskEntity> {
@@ -155,6 +157,24 @@ export class TaskService {
     activeTask.task = task;
 
     await this.activeTaskRepository.save(activeTask);
+  }
+
+  async getProductsInBigBox(id: number): Promise<number> {
+    const task = await this.taskRepository.findOne({
+      where: { id },
+    });
+    if (task && task.piecesPerSmallBox && task.piecesPerBigBox) {
+      return task.piecesPerBigBox * task.piecesPerSmallBox;
+    } else throw new NotFoundException(`Неправильная конфигурация задания ${id}`);
+  }
+
+  async getProductsInPalletId(id: number): Promise<number> {
+    const task = await this.taskRepository.findOne({
+      where: { id },
+    });
+    if (task && task.piecesPerSmallBox && task.piecesPerBigBox) {
+      return task.piecesPerBigBox * task.piecesPerSmallBox * task.piecesPerPallet;
+    } else throw new NotFoundException(`Неправильная конфигурация задания ${id}`);
   }
 
   private async readCodesFromFiles(filePaths: string[], numberValue?: number): Promise<string[]> {

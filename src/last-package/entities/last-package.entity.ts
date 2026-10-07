@@ -1,9 +1,4 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
 @Entity('last_package')
 export class LastPackageEntity {
@@ -14,7 +9,10 @@ export class LastPackageEntity {
   gtin: string;
 
   @Column()
-  boxNumber: number;
+  smallBoxNumber: number;
+
+  @Column()
+  bigBoxNumber: number;
 
   @Column()
   palletNumber: number;

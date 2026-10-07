@@ -64,6 +64,7 @@ export const backupLogger = createLogger('backup');
 export const printerLogger = createLogger('printer');
 export const loggerGS1 = createLogger('loggerGS1');
 export const templateLogger = createLogger('template');
+export const usersLogger = createLogger('users');
 
 export const getLastLogMessages = () => logMessages.slice(0, 1);
 export const getLogMessages = () => logMessages;

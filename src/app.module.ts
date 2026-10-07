@@ -15,6 +15,7 @@ import { PrinterModule } from './printers/printer.module';
 import { NomenclaturesModule } from './nomenclatures/nomenclatures.module';
 import { AppGateway } from './app.gateway';
 import { Module } from '@nestjs/common';
+import { UserModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { Module } from '@nestjs/common';
     PrinterModule,
     NomenclaturesModule,
     AppGateway,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

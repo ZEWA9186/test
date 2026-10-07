@@ -42,43 +42,42 @@ export async function printLabelBox(
   }
   try {
     printer.clear();
-    const encoding = EncodingType.UTF8;
-    const decoding = EncodingType.UTF8;
+    const encoding = EncodingType.WIN1251;
+    const decoding = EncodingType.WIN1251;
     console.log('--------encoding,decoding ----box', encoding, decoding, printerName);
-    const label =  task.smallBoxLabel;
+    const label = task.smallBoxLabel;
     const data = await fs.promises.readFile(`${getTemplateDirectory()}/${label}.prn`);
     const decodedData = iconv.decode(data, decoding);
     let modifiedData = decodedData;
-    // const taskKeys = Object.keys(task);
-    // taskKeys.forEach((key) => {
-    //   const placeholder = `<${key}>`;
-    //   const value = task[key];
-    //   modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
-    // });
+    const taskKeys = Object.keys(task);
+    taskKeys.forEach((key) => {
+      const placeholder = `<${key}>`;
+      const value = task[key];
+      modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
+    });
 
-    // const gs1128 = generateLabel(boxTemplate, task, boxNumber, LABEL_FORMATS.ZPL, countInBox);
-    // const gs1128_dm = generateLabel(boxTemplate, task, boxNumber, LABEL_FORMATS.DM_ZPL, countInBox);
-    // const gs1128_dis = generateLabel(
-    //   boxTemplate,
-    //   task,
-    //   boxNumber,
-    //   LABEL_FORMATS.PEOPLE_ZPL,
-    //   countInBox,
-    // );
-    // console.log(gs1128_dm, gs1128_dis, gs1128);
-    // console.log('......', globalMonVar.task);
+    const gs1128 = generateLabel(boxTemplate, task, boxNumber, LABEL_FORMATS.ZPL, countInBox);
+    const gs1128_dm = generateLabel(boxTemplate, task, boxNumber, LABEL_FORMATS.DM_ZPL, countInBox);
+    const gs1128_dis = generateLabel(
+      boxTemplate,
+      task,
+      boxNumber,
+      LABEL_FORMATS.PEOPLE_ZPL,
+      countInBox,
+    );
+    console.log(gs1128_dm, gs1128_dis, gs1128);
 
     modifiedData = modifiedData
       .replace('<nnn_package>', `${boxNumber}`)
       .replace('<nnn_pallet>', `${boxNumber}`)
       .replace('<nnn_pieces_per_package>', `${countInBox}`)
-      // .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
-      // .replace('<nnn_netto_box_kg>', `${getBoxNettoKG(task.nettoUnit, countInBox)}`)
-      // .replace('<nnn_netto_unit_kg>', `${getNettoUnitKG(task.nettoUnit)}`)
-      // .replace('<gs1128>', gs1128)
-      // .replace('<gs1128_dm>', gs1128_dm)
-      // .replace('<gs1128_dis>', gs1128_dis);
-    // console.log('----------=', modifiedData);
+      .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
+      .replace('<nnn_netto_box_kg>', `${getBoxNettoKG(task.nettoUnit, countInBox)}`)
+      .replace('<nnn_netto_unit_kg>', `${getNettoUnitKG(task.nettoUnit)}`)
+      .replace('<gs1128>', gs1128)
+      .replace('<gs1128_dm>', gs1128_dm)
+      .replace('<gs1128_dis>', gs1128_dis);
+    console.log('----------=', modifiedData);
 
     const encodedData = iconv.encode(modifiedData, encoding);
     const newFileName = `${getTemplateDirectory()}\\${Date.now()}.prn`.replace(/\//g, '\\');

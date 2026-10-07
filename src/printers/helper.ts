@@ -86,7 +86,7 @@ const generate = (options: GenerateOptions) => {
 
   const result = blocks
     .map((block, index) => {
-      const config  = AI_CONFIG[block];
+      const config = AI_CONFIG[block];
       if (!config) return '';
 
       let value = getBlockValue(
@@ -149,38 +149,77 @@ const getBlockValue = (
     '02 gtin': () => getValue('gtin'),
     '02 itf14': () => getValue('ITF14'),
     '10': () => getValue('batch'),
-    '11': () => formatDate(task.date_manufacture),
-    '17': () => formatDate(task.date_expiration),
+
+    // ИЗМЕНЕНО:
+    // Было task.date_manufacture из JSON.
+    // Теперь поле TaskEntity называется dateManufacture.
+    '11': () => formatDate(task.dateManufacture),
+
+    // ИЗМЕНЕНО:
+    // Было task.date_expiration из JSON.
+    // Теперь поле TaskEntity называется dateExpiration.
+    '17': () => formatDate(task.dateExpiration),
+
     '21': () => String(packagingNumber),
 
     // Количество коробок (AI 30)
     '30': () => {
-      const count = boxCount !== undefined ? boxCount : task.boxCount;
+      // ИЗМЕНЕНО:
+      // task.boxCount больше нет в TaskEntity.
+      // Используем только значение, переданное в boxCount.
+      const count = boxCount;
+
       return count !== undefined ? String(count) : '';
     },
 
     // Количество продуктов (AI 37)
     '37': () => {
-      const count = productCount !== undefined ? productCount : task.product_count;
+      // ИЗМЕНЕНО:
+      // task.product_count больше нет в TaskEntity.
+      // Используем только значение, переданное в productCount.
+      const count = productCount;
+
       return count !== undefined ? String(count) : '';
     },
 
     // Вес нетто в кг (AI 3103)
     '3103': () => {
-      const weight = nettoWeight !== undefined ? nettoWeight : task.weight_kg;
+      // ИЗМЕНЕНО:
+      // Было task.weight_kg.
+      // В TaskEntity такого поля нет.
+      // Используем nettoUnit.
+      //
+      // nettoUnit в текущем коде используется как значение
+      // в граммах, поэтому переводим в килограммы.
+      const weight =
+        nettoWeight !== undefined
+          ? nettoWeight
+          : task.nettoUnit !== undefined
+            ? Number(task.nettoUnit) / 1000
+            : undefined;
+
       return weight !== undefined ? formatWeight(weight) : '000000';
     },
 
     // Вес брутто в кг (AI 3303)
     '3303': () => {
-      const weight = bruttoWeight !== undefined ? bruttoWeight : task.brutto_weight_kg;
+      // ИЗМЕНЕНО:
+      // Было task.brutto_weight_kg.
+      // В TaskEntity такого поля нет.
+      // Используем bruttoUnit.
+      const weight =
+        bruttoWeight !== undefined
+          ? bruttoWeight
+          : task.bruttoUnit !== undefined
+            ? Number(task.bruttoUnit) / 1000
+            : undefined;
+
       return weight !== undefined ? formatWeight(weight) : '000000';
     },
   };
 
   return map[block]?.() || '';
 };
-
 // ============ ОЖИДАЕМЫЕ ЗНАЧЕНИЯ ДЛЯ ВАЛИДАЦИИ ============
 export const getExpectedBlockValue = (
   task: any,
@@ -241,7 +280,7 @@ const createGenerator = (config: {
   ) => {
     const formatOptions: Record<string, string> = {};
 
-    Object.entries(AI_CONFIG).forEach(([key, val] :[string, any]) => {
+    Object.entries(AI_CONFIG).forEach(([key, val]: [string, any]) => {
       formatOptions[key] = config.useLabel ? val.label : val.ai;
     });
 
