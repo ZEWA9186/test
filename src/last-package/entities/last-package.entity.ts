@@ -1,5 +1,6 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
 
+@Index(['gtin', 'dateTask', 'batchNumber'], { unique: true })
 @Entity('last_package')
 export class LastPackageEntity {
   @PrimaryGeneratedColumn()
@@ -8,21 +9,21 @@ export class LastPackageEntity {
   @Column()
   gtin: string;
 
-  @Column()
+  @Column({ name: 'small_box_number', nullable: true })
   smallBoxNumber: number;
 
-  @Column()
+  @Column({ name: 'big_box_number', nullable: true })
   bigBoxNumber: number;
 
-  @Column()
+  @Column({ name: 'pallet_number', nullable: true })
   palletNumber: number;
 
-  @Column()
+  @Column({ name: 'date_task' })
   dateTask: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @Column()
+  @Column({ name: 'batch_number' })
   batchNumber: string;
 }

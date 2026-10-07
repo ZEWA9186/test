@@ -11,59 +11,62 @@ export class LastPackageService {
   ) {}
 
   async updateSmallBoxNumber(gtin: string, dateTask: string, batchNumber: string) {
-    const existing = await this.lastPackageEntityRepository.findOne({
-      where: { gtin, dateTask, batchNumber },
-    });
-
-    const result =
-      existing ??
-      this.lastPackageEntityRepository.create({
+    const result = await this.lastPackageEntityRepository
+      .createQueryBuilder()
+      .insert()
+      .into(LastPackageEntity)
+      .values({
         gtin,
-        smallBoxNumber: 0,
         dateTask,
         batchNumber,
-      });
-    result.smallBoxNumber += 1;
+        smallBoxNumber: 1,
+      })
+      .onConflict(
+        `("gtin", "dateTask", "batchNumber") DO UPDATE SET "smallBoxNumber" = "last_package_entity"."smallBoxNumber" + 1`,
+      )
+      .returning('smallBoxNumber')
+      .execute();
 
-    const saved = await this.lastPackageEntityRepository.save(result);
-    return saved.smallBoxNumber;
+    return result.raw[0].smallBoxNumber;
   }
 
   async updateBigBoxNumber(gtin: string, dateTask: string, batchNumber: string) {
-    const existing = await this.lastPackageEntityRepository.findOne({
-      where: { gtin, dateTask, batchNumber },
-    });
-
-    const result =
-      existing ??
-      this.lastPackageEntityRepository.create({
+    const result = await this.lastPackageEntityRepository
+      .createQueryBuilder()
+      .insert()
+      .into(LastPackageEntity)
+      .values({
         gtin,
-        bigBoxNumber: 0,
         dateTask,
         batchNumber,
-      });
-    result.bigBoxNumber += 1;
+        bigBoxNumber: 1,
+      })
+      .onConflict(
+        `("gtin", "dateTask", "batchNumber") DO UPDATE SET "bigBoxNumber" = "last_package_entity"."bigBoxNumber" + 1`,
+      )
+      .returning('bigBoxNumber')
+      .execute();
 
-    const saved = await this.lastPackageEntityRepository.save(result);
-    return saved.bigBoxNumber;
+    return result.raw[0].bigBoxNumber;
   }
 
   async updatePalletNumber(gtin: string, dateTask: string, batchNumber: string) {
-    const existing = await this.lastPackageEntityRepository.findOne({
-      where: { gtin, dateTask, batchNumber },
-    });
-
-    const result =
-      existing ??
-      this.lastPackageEntityRepository.create({
+    const result = await this.lastPackageEntityRepository
+      .createQueryBuilder()
+      .insert()
+      .into(LastPackageEntity)
+      .values({
         gtin,
-        palletNumber: 0,
         dateTask,
         batchNumber,
-      });
-    result.palletNumber += 1;
+        palletNumber: 1,
+      })
+      .onConflict(
+        `("gtin", "dateTask", "batchNumber") DO UPDATE SET "palletNumber" = "last_package_entity"."palletNumber" + 1`,
+      )
+      .returning('palletNumber')
+      .execute();
 
-    const saved = await this.lastPackageEntityRepository.save(result);
-    return saved.palletNumber;
+    return result.raw[0].palletNumber;
   }
 }

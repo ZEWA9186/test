@@ -75,8 +75,8 @@ export class PrinterQueueService {
 
       try {
         this.logger.info(`Печать задания: ${printJob.label}`);
-
-        await this.sendPrintCommands(PrinterLabels.Printer1, printJob.commands, printJob.label);
+        //TODO Изменить принтеры
+        await this.sendPrintCommands(PrinterLabels.Printer2, printJob.commands, printJob.label);
 
         this.printQueue.shift();
 
@@ -90,7 +90,7 @@ export class PrinterQueueService {
           `Ошибка печати ${printJob.label}: ${error.message}. Проверяем принтер...`,
         );
 
-        const isReady = await this.waitForPrinterRecovery(PrinterLabels.Printer1);
+        const isReady = await this.waitForPrinterRecovery(PrinterLabels.Printer2);
 
         if (!isReady) {
           this.logger.error(
@@ -123,7 +123,6 @@ export class PrinterQueueService {
       this.logger.info('Очередь печати обработана');
     }
   }
-
 
   private async waitForPrinterRecovery(printerName: string): Promise<boolean> {
     let attempts = 0;

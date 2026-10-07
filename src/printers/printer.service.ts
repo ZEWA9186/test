@@ -46,7 +46,7 @@ export class PrinterService implements OnModuleInit {
     type: string,
     host: string,
     port: number,
-    enabled: boolean = false,
+    enabled: boolean = true,
   ): Promise<void> {
     const config = await this.printerConfigService.saveConfig(name, type, host, port, enabled);
 
@@ -91,13 +91,12 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов в малой коробке');
     }
 
-    const boxNumber = await this.lastPackageService.updateSmallBoxNumber(
-      task.gtin,
-      task.dateManufacture,
-      task.batch,
-    );
-
     for (let i = 0; i < task.piecesPerSmallBox; i++) {
+      const boxNumber = await this.lastPackageService.updateSmallBoxNumber(
+        task.gtin,
+        task.dateManufacture,
+        task.batch,
+      );
       await this.printSmallBoxLabel(boxNumber, task.id);
     }
   }
@@ -113,13 +112,12 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов в большой коробке');
     }
 
-    const boxNumber = await this.lastPackageService.updateBigBoxNumber(
-      task.gtin,
-      task.dateManufacture,
-      task.batch,
-    );
-
     for (let i = 0; i < task.piecesPerBigBox; i++) {
+      const boxNumber = await this.lastPackageService.updateBigBoxNumber(
+        task.gtin,
+        task.dateManufacture,
+        task.batch,
+      );
       await this.printBigBoxLabel(boxNumber, task.id);
     }
   }
@@ -135,22 +133,21 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов на паллете');
     }
 
-    const palletNumber = await this.lastPackageService.updatePalletNumber(
-      task.gtin,
-      task.dateManufacture,
-      task.batch,
-    );
-
     for (let i = 0; i < task.piecesPerPallet; i++) {
+      const palletNumber = await this.lastPackageService.updatePalletNumber(
+        task.gtin,
+        task.dateManufacture,
+        task.batch,
+      );
       await this.printPalletLabel(palletNumber, task.id);
     }
   }
 
   public async printSmallBoxLabel(boxNumber: number, taskId: number): Promise<void> {
-    const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer2);
+    const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer1);
 
     if (!printer) {
-      this.logger.error(`Принтер ${PrinterLabels.Printer2} не подключён`);
+      this.logger.error(`Принтер ${PrinterLabels.Printer1} не подключён`);
       return;
     }
 
@@ -172,7 +169,7 @@ export class PrinterService implements OnModuleInit {
       return;
     }
 
-    const printerName = process.env.PRINTER_NAME_2 || '';
+    const printerName = process.env.PRINTER_NAME_1 || '';
 
     try {
       await printLabelBox(
@@ -190,10 +187,10 @@ export class PrinterService implements OnModuleInit {
   }
 
   public async printBigBoxLabel(boxNumber: number, taskId: number): Promise<void> {
-    const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer2);
+    const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer1);
 
     if (!printer) {
-      this.logger.error(`Принтер ${PrinterLabels.Printer2} не подключён`);
+      this.logger.error(`Принтер ${PrinterLabels.Printer1} не подключён`);
       return;
     }
 
@@ -217,7 +214,7 @@ export class PrinterService implements OnModuleInit {
 
     const ProductsInBigBox = await this.taskService.getProductsInBigBox(taskId);
     //TODO Исправить генератор, добавить количество продуктов в коробке
-    const printerName = process.env.PRINTER_NAME_2 || '';
+    const printerName = process.env.PRINTER_NAME_1 || '';
 
     try {
       await printLabelBox(
@@ -236,10 +233,10 @@ export class PrinterService implements OnModuleInit {
 
   public async printPalletLabel(palletNumber: number, taskId: number): Promise<void> {
     try {
-      const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer3);
+      const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer1);
 
       if (!printer) {
-        this.logger.error(`Принтер ${PrinterLabels.Printer3} не подключён`);
+        this.logger.error(`Принтер ${PrinterLabels.Printer1} не подключён`);
         return;
       }
 

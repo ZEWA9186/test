@@ -28,6 +28,10 @@ export class NomenclaturesService {
     return await this.nomenclatureRepository.save(nomenclature);
   }
 
+  async updateNomenclature(data: NomenclatureEntity): Promise<NomenclatureEntity> {
+    return await this.nomenclatureRepository.save(data);
+  }
+
   async deleteNomenclature(id: number): Promise<void> {
     const nomenclature = await this.getNomenclatureById(id);
 

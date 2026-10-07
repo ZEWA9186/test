@@ -25,6 +25,11 @@ export class NomenclaturesController {
     return await this.nomenclaturesService.createNomenclature(data);
   }
 
+  @Post('updateNomenclature')
+  async updateNomenclature(@Body() data: NomenclatureEntity): Promise<NomenclatureEntity> {
+    return await this.nomenclaturesService.updateNomenclature(data);
+  }
+
   @Post(':id')
   async deleteNomenclature(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
     await this.nomenclaturesService.deleteNomenclature(id);

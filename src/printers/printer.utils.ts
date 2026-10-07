@@ -119,7 +119,8 @@ export async function printLabelPallet(
     logger.warn('Принтер: Принтер не подключен');
     return;
   }
-  if (!task.labelPallet) {
+  console.log(task);
+  if (!task.palletLabel) {
     logger.warn('Принтер: Не задана этикетка паллеты');
     return;
   }
@@ -132,7 +133,7 @@ export async function printLabelPallet(
       printer2DecodeType === PrintersTypes.ZPL ? EncodingType.UTF8 : EncodingType.WIN1251;
     console.log('--------encoding,decoding ----pallet', encoding, decoding, printerName);
 
-    fs.readFile(`${getTemplateDirectory()}/${task.labelPallet}.prn`, (err, data) => {
+    fs.readFile(`${getTemplateDirectory()}/${task.palletLabel}.prn`, (err, data) => {
       if (err) {
         logger.error('Ошибка чтения файла паллеты:', err);
         return;
