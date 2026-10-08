@@ -1,7 +1,7 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Header } from '@nestjs/common';
 
 import { PrinterService } from './printer.service';
-import { PrinterLabels, PrinterNames } from './types';
+import { PrinterLabels } from './types';
 
 @Controller('printer')
 export class PrinterController {
@@ -27,33 +27,16 @@ export class PrinterController {
     );
   }
 
-  // ============================================================
-  // DATAMATRIX
-  // ============================================================
-
   @Post('print-DM')
   async printDM(@Body('taskId') taskId: number): Promise<void> {
     await this.printerService.printAllDM(taskId);
   }
 
-  // ============================================================
-  // КОНФИГУРАЦИЯ ПРИНТЕРА
-  // ============================================================
-
+  @Header('Cache-Control', 'no-store')
   @Get(':label')
   async getConfig(@Param('label') label: PrinterLabels): Promise<any> {
     try {
-      let name = PrinterNames.Printer1;
-
-      if (label === PrinterLabels.Printer2) {
-        name = PrinterNames.Printer2;
-      } else if (label === PrinterLabels.Printer3) {
-        name = PrinterNames.Printer3;
-      } else if (label === PrinterLabels.Printer4) {
-        name = PrinterNames.Printer4;
-      }
-
-      return await this.printerService.getConfigByName(name);
+      return await this.printerService.getConfigByName(label);
     } catch (err) {
       console.log('getConfig', err);
     }
