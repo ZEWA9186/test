@@ -56,16 +56,7 @@ export async function printLabelBox(
       modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
     });
 
-    const gs1128 = generateLabel(boxTemplate, task, boxNumber, LABEL_FORMATS.ZPL, countInBox);
-    const gs1128_dm = generateLabel(boxTemplate, task, boxNumber, LABEL_FORMATS.DM_ZPL, countInBox);
-    const gs1128_dis = generateLabel(
-      boxTemplate,
-      task,
-      boxNumber,
-      LABEL_FORMATS.PEOPLE_ZPL,
-      countInBox,
-    );
-    console.log(gs1128_dm, gs1128_dis, gs1128);
+    const sscc = generateLabel('8', `${boxNumber}`);
 
     modifiedData = modifiedData
       .replace('<nnn_package>', `${boxNumber}`)
@@ -74,9 +65,7 @@ export async function printLabelBox(
       .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
       .replace('<nnn_netto_box_kg>', `${getBoxNettoKG(task.nettoUnit, countInBox)}`)
       .replace('<nnn_netto_unit_kg>', `${getNettoUnitKG(task.nettoUnit)}`)
-      .replace('<gs1128>', gs1128)
-      .replace('<gs1128_dm>', gs1128_dm)
-      .replace('<gs1128_dis>', gs1128_dis);
+      .replace('<sscc>', `${sscc}`);
     console.log('----------=', modifiedData);
 
     const encodedData = iconv.encode(modifiedData, encoding);
@@ -149,38 +138,13 @@ export async function printLabelPallet(
       // Заменяем <nnn_items_per_pallet> на значение или пробел, если не указано
       const itemsPerPalletValue = itemsPerPallet ? `${itemsPerPallet}` : '';
 
-      const gs1128 = generateLabel(
-        palletTemplate,
-        task,
-        palletNumber,
-        LABEL_FORMATS.ZPL,
-        +itemsPerPalletValue,
-        countInPallet,
-      );
-      const gs1128_dm = generateLabel(
-        palletTemplate,
-        task,
-        palletNumber,
-        LABEL_FORMATS.DM_ZPL,
-        +itemsPerPalletValue,
-        countInPallet,
-      );
-      const gs1128_dis = generateLabel(
-        palletTemplate,
-        task,
-        palletNumber,
-        LABEL_FORMATS.PEOPLE_ZPL,
-        +itemsPerPalletValue,
-        countInPallet,
-      );
+      const sscc = generateLabel('9', `${palletNumber}`);
 
       modifiedData = modifiedData
         .replace('<nnn_pallet>', `${palletNumber}`)
         .replace('<nnn_items_per_pallet>', itemsPerPalletValue) // Используем подготовленное значение
         .replace('<nnn_box_per_pallet>', `${countInPallet}`)
-        .replace('<gs1128>', gs1128)
-        .replace('<gs1128_dm>', gs1128_dm)
-        .replace('<gs1128_dis>', gs1128_dis);
+        .replace('<sscc>', sscc);
       const encodedData = iconv.encode(modifiedData, encoding);
       const newFileName = `${getTemplateDirectory()}\\${Date.now()}.prn`.replace(/\//g, '\\');
       fs.writeFile(newFileName, encodedData, (writeErr) => {

@@ -1,6 +1,6 @@
 import {
   Body,
-  Controller,
+  Controller, Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -21,4 +21,8 @@ export class AggregationController {
   ) {
     return await this.aggregationService.processScan(tsdId, code);
   }
+
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  async ping() {}
 }

@@ -119,13 +119,13 @@ export class TaskService {
   async getTaskInWorkForTsd(tsdId: number): Promise<TaskEntity[]> {
     const tasks = await this.getTasksForTsd(tsdId);
 
-    return tasks.filter((task) => task.activeTasks && task.activeTasks.length > 0);
+    return tasks.filter((task) => task.isActive);
   }
 
   async getTaskUnprocessedForTsd(tsdId: number): Promise<TaskEntity[]> {
     const tasks = await this.getTasksForTsd(tsdId);
 
-    return tasks.filter((task) => !task.activeTasks || task.activeTasks.length === 0);
+    return tasks.filter((task) => !task.isActive);
   }
 
   async startTask(tsdId: number, taskId: number): Promise<void> {
@@ -138,6 +138,8 @@ export class TaskService {
     let activeTask = await this.activeTaskRepository.findOne({
       where: { tsdId },
     });
+
+
 
     if (!activeTask) {
       activeTask = this.activeTaskRepository.create({

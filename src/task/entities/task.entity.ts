@@ -125,6 +125,9 @@ export class TaskEntity {
   @OneToMany(() => PackagingEntity, (packaging) => packaging.task)
   packages: PackagingEntity[];
 
+  @Column({ name: 'is_active', type: 'boolean', default: false })
+  isActive: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

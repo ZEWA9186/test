@@ -14,21 +14,21 @@ export class AggregationService {
     private readonly aggregationProductService: AggregationProductService,
     private readonly aggregationContainerService: AggregationContainerService,
     private readonly codeService: CodeService,
-    private readonly gs1Parser: Gs1ParserService
+    private readonly gs1Parser: Gs1ParserService,
   ) {}
 
   async processScan(tsdId: number, code: string) {
-    // await this.codeService.validateAndSaveCode(code);
-
+    //TODO Не дублировать инфу в связанной таблице
     const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
 
     const scanType = this.gs1Parser.getScanType(code, activeTask);
 
     if (scanType !== activeTask.expectedScan) {
-      throw new BadRequestException(`Ожидался ${activeTask.expectedScan}`)
+      throw new BadRequestException(`Ожидался ${activeTask.expectedScan}`);
     }
 
     if (activeTask.expectedScan === ExpectedScanType.PRODUCT) {
+      await this.codeService.validateAndSaveCode(code);
       return this.aggregationProductService.addProduct(activeTask, code);
     }
 

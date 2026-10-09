@@ -11,13 +11,12 @@ export class AggregationProductService {
   async addProduct(activeTask: ActiveTaskEntity, code: string) {
     try {
       await this.aggregationRepository.addProduct(activeTask, code);
-
       const count = await this.aggregationRepository.getOpenProductCount(activeTask);
 
       const limit = AggregationRules.getProductLimit(activeTask);
 
       if (count < limit) {
-        return;
+        return activeTask.expectedScan;
       }
 
       activeTask.expectedScan = AggregationRules.getNextContainerType(activeTask);
@@ -25,7 +24,8 @@ export class AggregationProductService {
       await this.aggregationRepository.saveActiveTask(activeTask);
 
       return activeTask.expectedScan;
-    } catch (err: any){
+    } catch (err: any) {
+      console.log(err);
       throw new InternalServerErrorException('Не удалось добавить продукт');
     }
   }

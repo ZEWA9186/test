@@ -92,11 +92,7 @@ export class PrinterService implements OnModuleInit {
     }
 
     for (let i = 0; i < task.piecesPerSmallBox; i++) {
-      const boxNumber = await this.lastPackageService.updateSmallBoxNumber(
-        task.gtin,
-        task.dateManufacture,
-        task.batch,
-      );
+      const boxNumber = await this.lastPackageService.updateSmallBoxNumber();
       await this.printSmallBoxLabel(boxNumber, task.id);
     }
   }
@@ -113,11 +109,7 @@ export class PrinterService implements OnModuleInit {
     }
 
     for (let i = 0; i < task.piecesPerBigBox; i++) {
-      const boxNumber = await this.lastPackageService.updateBigBoxNumber(
-        task.gtin,
-        task.dateManufacture,
-        task.batch,
-      );
+      const boxNumber = await this.lastPackageService.updateBigBoxNumber();
       await this.printBigBoxLabel(boxNumber, task.id);
     }
   }
@@ -134,11 +126,7 @@ export class PrinterService implements OnModuleInit {
     }
 
     for (let i = 0; i < task.piecesPerPallet; i++) {
-      const palletNumber = await this.lastPackageService.updatePalletNumber(
-        task.gtin,
-        task.dateManufacture,
-        task.batch,
-      );
+      const palletNumber = await this.lastPackageService.updatePalletNumber();
       await this.printPalletLabel(palletNumber, task.id);
     }
   }

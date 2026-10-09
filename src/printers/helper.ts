@@ -317,6 +317,7 @@ const createGenerator = (config: {
 export type LabelFormat = (typeof LABEL_FORMATS)[keyof typeof LABEL_FORMATS];
 
 // ============ УНИВЕРСАЛЬНЫЙ ГЕНЕРАТОР ============
+/*
 export const generateLabel = (
   template: string[],
   task: any,
@@ -355,6 +356,7 @@ export const generateLabel = (
     bruttoWeight,
   );
 };
+*/
 
 // ============ ГЕНЕРАТОР ДЛЯ БАЗЫ ДАННЫХ ============
 export const generateDatabaseCipher = (
@@ -395,4 +397,22 @@ export const generateDatabaseCipher = (
     useSuffixes: true,
     padOddLength: true,
   });
+};
+
+//TODO расчёт контрольной суммы
+const calculateControlSum = (tempLabel: string) => {
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    sum += Number(tempLabel) * (i % 2 === 0 ? 3 : 1);
+  }
+
+  return `${tempLabel}${(10 - (sum % 10)) % 10}`;
+};
+
+export const generateLabel = (labelType: string, packageNumber: string): string => {
+  const formatPackageNumber = packageNumber.padStart(7, '0');
+  const tempLabel = `00${labelType}${process.env.GLN}${formatPackageNumber}`;
+  calculateControlSum(tempLabel);
+
+  return calculateControlSum(tempLabel);
 };

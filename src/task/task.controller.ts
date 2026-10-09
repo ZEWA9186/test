@@ -21,6 +21,16 @@ export class TaskController {
     return await this.taskService.getAllTask();
   }
 
+  @Get('tsd/:tsdId/in-work')
+  async getTaskInWorkForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
+    return await this.taskService.getTaskInWorkForTsd(tsdId);
+  }
+
+  @Get('tsd/:tsdId/unprocessed')
+  async getTaskUnprocessedForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
+    return await this.taskService.getTaskUnprocessedForTsd(tsdId);
+  }
+
   @Get(':id')
   async getTaskById(@Param('id', ParseIntPipe) id: number) {
     return await this.taskService.getTaskById(id);
@@ -43,16 +53,6 @@ export class TaskController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async appointTsds(@Param('id', ParseIntPipe) id: number, @Body('tsdIds') tsdIds: number[]) {
     await this.taskService.appointTsds(tsdIds, id);
-  }
-
-  @Get('tsd/:tsdId/in-work')
-  async getTaskInWorkForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
-    return await this.taskService.getTaskInWorkForTsd(tsdId);
-  }
-
-  @Get('tsd/:tsdId/unprocessed')
-  async getTaskUnprocessedForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
-    return await this.taskService.getTaskUnprocessedForTsd(tsdId);
   }
 
   @Post(':id/start')
