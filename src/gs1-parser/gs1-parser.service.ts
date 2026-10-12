@@ -1,8 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 
-import { FIXED_LENGTH_AI, TemplateItem } from './interfaces/gs1.types';
-import { TemplateTypes } from '../globalTypes';
-import { TemplateService } from '../template/template.service';
 import { ActiveTaskEntity, ExpectedScanType } from '../aggregation/entities/active-task.entity';
 import { loggerGS1 } from '../logger-winston/winston.config';
 
@@ -10,71 +7,32 @@ import { loggerGS1 } from '../logger-winston/winston.config';
 export class Gs1ParserService {
   private readonly GS = '\x1D';
 
-  constructor(private readonly templateService: TemplateService) {}
 
   getScanType(code: string, activeTask: ActiveTaskEntity): ExpectedScanType {
-    if (!code) {
+    if (!code?.trim()) {
       this.throwGs1Error('Пустой код');
     }
 
-    if (!activeTask) {
-      this.throwGs1Error('Нет активного задания');
-    }
+    const normalizedCode = this.normalizeGS(code.trim());
 
-    const normalizedCode = this.normalizeGS(code);
-
-    // Обычный код товара
     if (this.isProductCode(normalizedCode)) {
       this.validateProduct(normalizedCode, activeTask);
-
       return ExpectedScanType.PRODUCT;
     }
 
-    const templates = this.templateService.getAll();
-
-    const templateTypes = [
-      {
-        type: TemplateTypes.smallBox,
-        scanType: ExpectedScanType.SMALL_BOX_LABEL,
-      },
-      {
-        type: TemplateTypes.bigBox,
-        scanType: ExpectedScanType.BIG_BOX_LABEL,
-      },
-      {
-        type: TemplateTypes.pallet,
-        scanType: ExpectedScanType.PALLET_LABEL,
-      },
-    ];
-
-    for (const { type, scanType } of templateTypes) {
-      const template = templates.find((item) => item.type === type);
-
-      if (!template) {
-        continue;
-      }
-
-      const parsedData = this.parseByTemplate(normalizedCode, template.template);
-
-      if (!parsedData) {
-        continue;
-      }
-
-      this.validateAgainstTask(parsedData, template.template, activeTask);
-
-      return scanType;
-    }
-
-    this.throwGs1Error('Код не соответствует формату товара, коробки или палеты');
+    return this.parseSscc(normalizedCode);
   }
 
-  /**
-   * Проверяет обычный код товара.
-   *
-   * Формат:
-   * 01 + GTIN(14) + 21 + серийный номер
-   */
-  private validateProduct(code: string, activeTask: ActiveTaskEntity): void {
+  getContainerNumber(code: string): string {
+    if (!code?.trim()) {
+      this.throwGs1Error('Пустой код');
+    }
+
+    return this.extractContainerNumber(code);
+  }
+
+  private validateProduct(code: string, activeTask: ActiveTaskEntity){
+
     if (!code.startsWith('01')) {
       this.throwGs1Error('Некорректный код товара: ожидается AI 01');
     }
@@ -83,7 +41,9 @@ export class Gs1ParserService {
 
     this.validateGtinFormat(gtin);
 
-    this.validateGtinAgainstTask(gtin, activeTask.gtin, 'GTIN товара');
+    if (gtin !== activeTask.gtin) {
+      this.throwGs1Error(`GTIN не совпадает с заданием`);
+    }
   }
 
   private isProductCode(code: string): boolean {
@@ -95,335 +55,87 @@ export class Gs1ParserService {
     );
   }
 
-  private parseByTemplate(code: string, rawTemplate: string[]): Record<string, string> | null {
-    const template = this.normalizeTemplate(rawTemplate);
-
-    const result: Record<string, string> = {};
-
-    let position = 0;
-
-    for (let i = 0; i < template.length; i++) {
-      const item = template[i];
-
-      if (!item.ai) {
-        continue;
-      }
-
-      const ai = item.ai;
-
-      // Проверяем AI в текущей позиции.
-      const actualAI = code.substring(position, position + ai.length);
-
-      if (actualAI !== ai) {
-        return null;
-      }
-
-      position += ai.length;
-
-      // AI фиксированной длины.
-      if (this.isFixedLength(ai)) {
-        const fixedLength = FIXED_LENGTH_AI[ai];
-
-        if (position + fixedLength > code.length) {
-          return null;
-        }
-
-        result[ai] = code.substring(position, position + fixedLength);
-
-        position += fixedLength;
-
-        continue;
-      }
-
-      const nextGSPosition = code.indexOf(this.GS, position);
-
-      if (nextGSPosition === -1) {
-        if (i === template.length - 1) {
-          result[ai] = code.substring(position);
-          position = code.length;
-
-          continue;
-        }
-
-        return null;
-      }
-
-      result[ai] = code.substring(position, nextGSPosition);
-
-      position = nextGSPosition + 1;
-
-      if (i < template.length - 1) {
-        const nextItem = template[i + 1];
-
-        if (nextItem.ai) {
-          if (position + nextItem.ai.length > code.length) {
-            return null;
-          }
-
-          const nextAI = code.substring(position, position + nextItem.ai.length);
-
-          if (nextAI !== nextItem.ai) {
-            return null;
-          }
-        }
-      }
+  private parseSscc(code: string) {
+    if (!code.startsWith('00')) {
+      this.throwGs1Error(
+        'Код не соответствует формату: ожидался товарный код AI 01 или SSCC с AI 00',
+      );
     }
 
-    if (position !== code.length) {
-      return null;
+    if (!/^00\d{18}$/.test(code)) {
+      this.throwGs1Error('Некорректный SSCC: после AI 00 должны идти ровно 18 цифр');
     }
 
-    return result;
+    const sscc = code.substring(2);
+
+    const extensionDigit = sscc.charAt(0);
+    const labelGln = sscc.substring(1, 10);
+
+    this.validateGln(labelGln);
+
+    return this.getContainerType(extensionDigit);
   }
 
-  private validateAgainstTask(
-    parsedData: Record<string, string>,
-    rawTemplate: string[],
-    activeTask: ActiveTaskEntity,
-  ): void {
-    const semanticMap = this.getSemanticMap(rawTemplate);
+  private getContainerType(extensionDigit: string): ExpectedScanType {
+    switch (extensionDigit) {
+      case '7':
+        return ExpectedScanType.SMALL_BOX_LABEL;
 
-    this.validateGtin(parsedData, semanticMap, activeTask);
+      case '8':
+        return ExpectedScanType.BIG_BOX_LABEL;
 
-    this.validateDate(
-      parsedData,
-      semanticMap,
-      'production_date',
-      activeTask.dateManufacture,
-      'Дата производства',
-    );
+      case '9':
+        return ExpectedScanType.PALLET_LABEL;
 
-    this.validateDate(
-      parsedData,
-      semanticMap,
-      'expiration_date',
-      activeTask.dateExpiration,
-      'Срок годности',
-    );
-
-    this.validateBatch(parsedData, semanticMap, activeTask.batch);
+      default:
+        this.throwGs1Error(
+          `Неизвестный тип тары в SSCC: ${extensionDigit}. Ожидалась цифра 7, 8 или 9`,
+        );
+    }
   }
 
-  private validateGtin(
-    parsedData: Record<string, string>,
-    semanticMap: Record<string, string>,
-    activeTask: ActiveTaskEntity,
-  ): void {
-    const labelGtin = this.extractGtin(parsedData, semanticMap);
+  private validateGln(labelGln: string) {
+    const expectedGln = process.env.GLN?.trim();
 
-    if (!labelGtin) {
-      this.throwGs1Error('В этикетке отсутствует GTIN/ITF14');
+    //TODO Отдельный модуль валидации енв
+
+    if (!expectedGln) {
+      const message = 'Не задан GLN в переменной окружения GLN';
+      loggerGS1.error(message);
+      throw new InternalServerErrorException(message);
     }
 
-    const expectedGtin = activeTask.gtin || activeTask.ITF14;
+    if (!/^\d{9}$/.test(expectedGln)) {
+      const message = 'Некорректная настройка GLN: ожидается идентификатор из 9 цифр';
 
-    if (!expectedGtin) {
-      this.throwGs1Error('В активном задании не указан GTIN/ITF14');
+      loggerGS1.error(message);
+      throw new InternalServerErrorException(message);
     }
 
-    this.validateGtinFormat(labelGtin);
-
-    this.validateGtinAgainstTask(labelGtin, expectedGtin, 'GTIN/ITF14 этикетки');
+    if (labelGln !== expectedGln) {
+      this.throwGs1Error(
+        `GLN этикетки не совпадает с настройкой: ожидался ${expectedGln}, получен ${labelGln}`,
+      );
+    }
   }
 
-  private extractGtin(
-    parsedData: Record<string, string>,
-    semanticMap: Record<string, string>,
-  ): string | undefined {
-    for (const [ai, value] of Object.entries(parsedData)) {
-      const semantic = semanticMap[ai];
-
-      if (semantic === 'gtin' || semantic === 'itf14') {
-        return value;
-      }
-    }
-
-    return parsedData['01'] || parsedData['02'];
+  private extractContainerNumber(sscc: string): string {
+    const serialReference = sscc.substring(10, 17);
+    return serialReference.replace(/^0+/, '') || '0';
   }
 
-  private validateGtinFormat(gtin: string): void {
+  private validateGtinFormat(gtin: string){
     if (!/^\d{14}$/.test(gtin)) {
-      this.throwGs1Error(`Некорректный GTIN: ожидается 14 цифр, получено "${gtin}"`);
+      this.throwGs1Error(`Некорректный GTIN`);
     }
-  }
-
-  private validateGtinAgainstTask(
-    actualGtin: string,
-    expectedGtin: string,
-    fieldName: string,
-  ): void {
-    if (!expectedGtin) {
-      this.throwGs1Error('В активном задании не указан GTIN');
-    }
-
-    if (actualGtin !== expectedGtin) {
-      this.throwGs1Error(
-        `${fieldName} не совпадает с заданием: ` +
-          `ожидался ${expectedGtin}, получен ${actualGtin}`,
-      );
-    }
-  }
-
-  private validateDate(
-    parsedData: Record<string, string>,
-    semanticMap: Record<string, string>,
-    semantic: string,
-    expectedDate: string,
-    fieldName: string,
-  ): void {
-    let valueFromLabel: string | undefined;
-
-    for (const [ai, value] of Object.entries(parsedData)) {
-      if (semanticMap[ai] === semantic) {
-        valueFromLabel = value;
-        break;
-      }
-    }
-
-    if (!valueFromLabel) {
-      return;
-    }
-
-    const expectedValue = this.formatDateForLabel(expectedDate);
-
-    if (valueFromLabel !== expectedValue) {
-      this.throwGs1Error(
-        `${fieldName} этикетки не совпадает с заданием: ` +
-          `ожидалось ${expectedValue}, получено ${valueFromLabel}`,
-      );
-    }
-  }
-
-  private validateBatch(
-    parsedData: Record<string, string>,
-    semanticMap: Record<string, string>,
-    expectedBatch: string,
-  ): void {
-    let batchFromLabel: string | undefined;
-
-    for (const [ai, value] of Object.entries(parsedData)) {
-      const semantic = semanticMap[ai];
-
-      if (semantic === 'batch' || semantic === 'lot') {
-        batchFromLabel = value;
-        break;
-      }
-    }
-
-    if (!batchFromLabel) {
-      batchFromLabel = parsedData['10'];
-    }
-
-    if (!batchFromLabel || !expectedBatch) {
-      return;
-    }
-
-    if (!this.compareBatchValue(batchFromLabel, expectedBatch)) {
-      this.throwGs1Error(
-        `Партия этикетки не совпадает с заданием: ` +
-          `ожидалась ${expectedBatch}, получена ${batchFromLabel}`,
-      );
-    }
-  }
-
-  private getSemanticMap(rawTemplate: string[]): Record<string, string> {
-    const template = this.normalizeTemplate(rawTemplate);
-
-    const semanticMap: Record<string, string> = {};
-
-    for (const item of template) {
-      if (item.ai && item.semantic) {
-        semanticMap[item.ai] = item.semantic;
-      }
-    }
-
-    return semanticMap;
-  }
-
-  private normalizeTemplate(template: string[]): TemplateItem[] {
-    return template.map((item) => {
-      if (!item || item.trim() === '') {
-        return {
-          ai: '',
-          fullString: '',
-        };
-      }
-
-      const parts = item.trim().split(/\s+/);
-
-      return {
-        ai: parts[0],
-        semantic: parts.slice(1).join(' ') || undefined,
-        fullString: item,
-      };
-    });
-  }
-
-  private isFixedLength(ai: string): boolean {
-    return ai in FIXED_LENGTH_AI;
   }
 
   private normalizeGS(code: string): string {
-    if (!code) {
-      return code;
-    }
-
-    return code.includes('\\x1D') ? code.replace(/\\x1D/g, String.fromCharCode(29)) : code;
-  }
-
-  private formatDateForLabel(date: string): string {
-    const [day, month, year] = date.split('.');
-
-    return `${year.slice(2)}${month}${day}`;
-  }
-
-  private compareBatchValue(valueFromLabel: string, expectedBatch: string): boolean {
-    if (!valueFromLabel || !expectedBatch) {
-      return false;
-    }
-
-    if (valueFromLabel === expectedBatch) {
-      return true;
-    }
-    if (expectedBatch.length % 2 === 0) {
-      return false;
-    }
-
-    if (
-      valueFromLabel.length === expectedBatch.length + 1 &&
-      valueFromLabel.startsWith('0') &&
-      valueFromLabel.substring(1) === expectedBatch
-    ) {
-      return true;
-    }
-
-    if (
-      valueFromLabel.length === expectedBatch.length - 1 &&
-      expectedBatch.startsWith('0') &&
-      valueFromLabel === expectedBatch.substring(1)
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Извлекает серийный/контейнерный номер AI 21.
-   */
-  private extractContainerNumber(parsedData: Record<string, string>): string | null {
-    const containerNumber = parsedData['21'];
-
-    if (!containerNumber) {
-      return null;
-    }
-
-    return containerNumber.replace(/^\x1D+|\x1D+$/g, '');
+    return code.includes('\\x1D') ? code.replace(/\\x1D/g, this.GS) : code;
   }
 
   private throwGs1Error(message: string): never {
     loggerGS1.error(message);
-
     throw new BadRequestException(message);
   }
 }

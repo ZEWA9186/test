@@ -1,11 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
-import { ExpectedScanType } from './entities/active-task.entity';
+import { ActiveTaskEntity, ExpectedScanType } from './entities/active-task.entity';
 import { AggregationRepository } from './repository/aggregation.repository';
 import { AggregationProductService } from './helper-service/aggregation-product.service';
 import { AggregationContainerService } from './helper-service/aggregation-container.service';
 import { CodeService } from '../code/code.service';
 import { Gs1ParserService } from '../gs1-parser/gs1-parser.service';
+import { AggregationRules } from './helper-service/aggregation.rules';
+import { AggregationInfoDto } from './dto/responce.dto';
 
 @Injectable()
 export class AggregationService {
@@ -18,7 +20,7 @@ export class AggregationService {
   ) {}
 
   async processScan(tsdId: number, code: string) {
-    //TODO Не дублировать инфу в связанной таблице
+    //TODO проверка задания
     const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
 
     const scanType = this.gs1Parser.getScanType(code, activeTask);
@@ -33,5 +35,126 @@ export class AggregationService {
     }
 
     return this.aggregationContainerService.closeContainer(activeTask, code);
+  }
+
+  async deleteCode(code: string, tsdId: number) {
+    await this.aggregationRepository.deleteProductAndResetExpectedScan(tsdId, code);
+  }
+
+  async addProductIntoPackage(packageLabel: string, tsdId: number, code: string) {
+    const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
+
+    const packageType = this.gs1Parser.getScanType(packageLabel, activeTask);
+
+    const expectedPackageType = AggregationRules.getNextContainerType(activeTask);
+
+    if (packageType !== expectedPackageType) {
+      throw new BadRequestException(`Товар можно добавить только в ${expectedPackageType}`);
+    }
+
+    const productType = this.gs1Parser.getScanType(code, activeTask);
+
+    if (productType !== ExpectedScanType.PRODUCT) {
+      throw new BadRequestException('Ожидался товарный код');
+    }
+
+    return this.aggregationProductService.addProductIntoPackage(
+      activeTask,
+      code,
+      packageLabel,
+      packageType,
+    );
+  }
+
+  async searchProductInfo(tsdId: number, code: string): Promise<AggregationInfoDto> {
+    const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
+    const scanType = this.gs1Parser.getScanType(code, activeTask);
+
+    if (scanType !== ExpectedScanType.PRODUCT) {
+      throw new BadRequestException('Передан код не товара');
+    }
+
+    const product = await this.aggregationRepository.searchProductInfo(activeTask, code);
+
+    return {
+      scanType,
+      code: product.code,
+      number: null,
+      parents: {
+        smallBox: this.getContainerNumber(product.smallBoxLabel),
+        bigBox: this.getContainerNumber(product.bigBoxLabel),
+        pallet: this.getContainerNumber(product.palletLabel),
+      },
+      contentsCount: null,
+      contentsType: null,
+    };
+  }
+
+  async searchPackageInfo(tsdId: number, packageLabel: string): Promise<AggregationInfoDto> {
+    const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
+    const scanType = this.gs1Parser.getScanType(packageLabel, activeTask);
+
+    if (scanType === ExpectedScanType.PRODUCT) {
+      throw new BadRequestException('Передан код товара, а не упаковки');
+    }
+
+    const packaging = await this.aggregationRepository.searchPackageInfo(
+      activeTask,
+      packageLabel,
+      scanType,
+    );
+
+    const contentsCount = await this.aggregationRepository.countPackageContents(
+      activeTask,
+      packageLabel,
+      scanType,
+    );
+
+    let parents = {
+      smallBox: null as string | null,
+      bigBox: null as string | null,
+      pallet: null as string | null,
+    };
+
+    switch (scanType) {
+      case ExpectedScanType.SMALL_BOX_LABEL:
+        parents = {
+          smallBox: null,
+          bigBox: this.getContainerNumber(packaging.bigBoxLabel),
+          pallet: this.getContainerNumber(packaging.palletLabel),
+        };
+        break;
+
+      case ExpectedScanType.BIG_BOX_LABEL:
+        parents = {
+          smallBox: null,
+          bigBox: null,
+          pallet: this.getContainerNumber(packaging.palletLabel),
+        };
+        break;
+
+      case ExpectedScanType.PALLET_LABEL:
+        // У паллеты нет родительского контейнера.
+        break;
+    }
+
+    const contentsType = AggregationRules.getContentsType(activeTask, scanType);
+
+    return {
+      scanType,
+      code: packageLabel,
+      number: this.getContainerNumber(packageLabel),
+      parents,
+      contentsCount,
+      contentsType,
+    };
+  }
+
+  private getContainerNumber(label: string | null): string | null {
+    if (label === null) {
+      return null;
+    }
+
+    return this.gs1Parser.getContainerNumber(label);
   }
 }

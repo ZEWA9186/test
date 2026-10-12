@@ -44,10 +44,11 @@ export class TaskService {
   async createTask(data: any, nomenclatureId: number, numberValue?: number): Promise<TaskEntity> {
     const nomenclature = await this.nomenclaturesService.getNomenclatureById(nomenclatureId);
     //TODO привязка n числа кодов, а не всего файла, допривязка кодов.
+    //TODO Фронт рассинхрон ловит, там другой способ привязки кодов
     if (!nomenclature) {
       throw new NotFoundException(`Номенклатура с ID ${nomenclatureId} не найдена`);
     }
-
+    //TODO Валидация и получение енв отдельно
     const codeDir = process.env.CODES_DIRECTORY;
 
     if (!codeDir) {
@@ -139,16 +140,10 @@ export class TaskService {
       where: { tsdId },
     });
 
-
-
     if (!activeTask) {
       activeTask = this.activeTaskRepository.create({
         tsdId,
         gtin: task.gtin,
-        ITF14: task.ITF14,
-        batch: task.batch,
-        dateManufacture: task.dateManufacture,
-        dateExpiration: task.dateExpiration,
         aggregationLvl: task.aggregationLvl,
         piecesPerSmallBox: task.piecesPerSmallBox,
         piecesPerBigBox: task.piecesPerBigBox,
