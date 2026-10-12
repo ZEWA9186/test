@@ -3,10 +3,14 @@ import { BadRequestException, Injectable, InternalServerErrorException } from '@
 import { ActiveTaskEntity, ExpectedScanType } from '../entities/active-task.entity';
 import { AggregationRepository } from '../repository/aggregation.repository';
 import { AggregationRules } from './aggregation.rules';
+import { CodeService } from '../../code/code.service';
 
 @Injectable()
 export class AggregationProductService {
-  constructor(private readonly aggregationRepository: AggregationRepository) {}
+  constructor(
+    private readonly aggregationRepository: AggregationRepository,
+    private readonly codeService: CodeService,
+  ) {}
 
   async addProduct(activeTask: ActiveTaskEntity, code: string) {
     try {
@@ -53,18 +57,15 @@ export class AggregationProductService {
       packageType,
     );
 
+    await this.codeService.validateAndSaveCode(code);
+
     const productCount = await this.aggregationRepository.countProductsInPackage(
       activeTask,
       packageLabel,
     );
 
     if (productCount < limit) {
-      return {
-        success: true,
-        productCount,
-        limit,
-        expectedScan: activeTask.expectedScan,
-      };
+      return activeTask.expectedScan;
     }
 
     const hasParent =

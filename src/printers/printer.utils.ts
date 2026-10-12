@@ -56,7 +56,7 @@ export async function printLabelBox(
       modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
     });
 
-    const sscc = generateLabel('8', `${boxNumber}`);
+    const sscc = generateLabel('7', `${boxNumber}`);
 
     modifiedData = modifiedData
       .replace('<nnn_package>', `${boxNumber}`)
@@ -65,7 +65,7 @@ export async function printLabelBox(
       .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
       .replace('<nnn_netto_box_kg>', `${getBoxNettoKG(task.nettoUnit, countInBox)}`)
       .replace('<nnn_netto_unit_kg>', `${getNettoUnitKG(task.nettoUnit)}`)
-      .replace('<sscc>', `${sscc}`);
+      .replace('<gs1128_dm>', sscc);
     console.log('----------=', modifiedData);
 
     const encodedData = iconv.encode(modifiedData, encoding);
@@ -144,7 +144,7 @@ export async function printLabelPallet(
         .replace('<nnn_pallet>', `${palletNumber}`)
         .replace('<nnn_items_per_pallet>', itemsPerPalletValue) // Используем подготовленное значение
         .replace('<nnn_box_per_pallet>', `${countInPallet}`)
-        .replace('<sscc>', sscc);
+        .replace('<gs1128_dm>', sscc);
       const encodedData = iconv.encode(modifiedData, encoding);
       const newFileName = `${getTemplateDirectory()}\\${Date.now()}.prn`.replace(/\//g, '\\');
       fs.writeFile(newFileName, encodedData, (writeErr) => {

@@ -223,7 +223,11 @@ export class AggregationRepository {
     tsdId: number,
     packageLabel: string,
   ): Promise<ActiveTaskEntity> {
-    const result = await this.packagingRepository.delete({ code: packageLabel, tsdId });
+    const result = await this.packagingRepository.delete([
+      { tsdId, smallBoxLabel: packageLabel },
+      { tsdId, bigBoxLabel: packageLabel },
+      { tsdId, palletLabel: packageLabel },
+    ]);
 
     if (!result.affected) {
       throw new NotFoundException(`Код ${packageLabel} не найден для ТСД ${tsdId}`);

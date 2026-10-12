@@ -7,7 +7,6 @@ import { loggerGS1 } from '../logger-winston/winston.config';
 export class Gs1ParserService {
   private readonly GS = '\x1D';
 
-
   getScanType(code: string, activeTask: ActiveTaskEntity): ExpectedScanType {
     if (!code?.trim()) {
       this.throwGs1Error('Пустой код');
@@ -31,8 +30,7 @@ export class Gs1ParserService {
     return this.extractContainerNumber(code);
   }
 
-  private validateProduct(code: string, activeTask: ActiveTaskEntity){
-
+  private validateProduct(code: string, activeTask: ActiveTaskEntity) {
     if (!code.startsWith('01')) {
       this.throwGs1Error('Некорректный код товара: ожидается AI 01');
     }
@@ -120,11 +118,11 @@ export class Gs1ParserService {
   }
 
   private extractContainerNumber(sscc: string): string {
-    const serialReference = sscc.substring(10, 17);
+    const serialReference = sscc.substring(13, 19);
     return serialReference.replace(/^0+/, '') || '0';
   }
 
-  private validateGtinFormat(gtin: string){
+  private validateGtinFormat(gtin: string) {
     if (!/^\d{14}$/.test(gtin)) {
       this.throwGs1Error(`Некорректный GTIN`);
     }

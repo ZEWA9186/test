@@ -30,7 +30,11 @@ export class AggregationService {
     }
 
     if (activeTask.expectedScan === ExpectedScanType.PRODUCT) {
-      await this.codeService.validateAndSaveCode(code);
+      try {
+        await this.codeService.validateAndSaveCode(code);
+      } catch (error) {
+        throw new BadRequestException(error);
+      }
       return this.aggregationProductService.addProduct(activeTask, code);
     }
 
@@ -39,6 +43,10 @@ export class AggregationService {
 
   async deleteCode(code: string, tsdId: number) {
     await this.aggregationRepository.deleteProductAndResetExpectedScan(tsdId, code);
+  }
+
+  async deletePackage(packageLabel: string, tsdId: number) {
+    await this.aggregationRepository.deletePackageAndResetExpectedScan(tsdId, packageLabel);
   }
 
   async addProductIntoPackage(packageLabel: string, tsdId: number, code: string) {
@@ -58,6 +66,11 @@ export class AggregationService {
       throw new BadRequestException('Ожидался товарный код');
     }
 
+    try {
+      await this.codeService.validateAndSaveCode(code);
+    } catch (error) {
+      throw new BadRequestException(error);
+    }
     return this.aggregationProductService.addProductIntoPackage(
       activeTask,
       code,
@@ -66,19 +79,31 @@ export class AggregationService {
     );
   }
 
-  async searchProductInfo(tsdId: number, code: string): Promise<AggregationInfoDto> {
+  async searchInfo(tsdId: number, code: string) {
     const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
     const scanType = this.gs1Parser.getScanType(code, activeTask);
-
-    if (scanType !== ExpectedScanType.PRODUCT) {
-      throw new BadRequestException('Передан код не товара');
+    if (scanType === ExpectedScanType.PRODUCT) {
+      return await this.searchProductInfo(code, activeTask, scanType);
     }
+    if (
+      scanType === ExpectedScanType.BIG_BOX_LABEL ||
+      scanType === ExpectedScanType.SMALL_BOX_LABEL ||
+      scanType == ExpectedScanType.PALLET_LABEL
+    ) {
+      return await this.searchPackageInfo(code, activeTask, scanType);
+    }
+    throw new BadRequestException();
+  }
 
+  private async searchProductInfo(
+    code: string,
+    activeTask: ActiveTaskEntity,
+    scanType: ExpectedScanType,
+  ): Promise<AggregationInfoDto> {
     const product = await this.aggregationRepository.searchProductInfo(activeTask, code);
 
     return {
       scanType,
-      code: product.code,
       number: null,
       parents: {
         smallBox: this.getContainerNumber(product.smallBoxLabel),
@@ -90,14 +115,11 @@ export class AggregationService {
     };
   }
 
-  async searchPackageInfo(tsdId: number, packageLabel: string): Promise<AggregationInfoDto> {
-    const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
-    const scanType = this.gs1Parser.getScanType(packageLabel, activeTask);
-
-    if (scanType === ExpectedScanType.PRODUCT) {
-      throw new BadRequestException('Передан код товара, а не упаковки');
-    }
-
+  async searchPackageInfo(
+    packageLabel: string,
+    activeTask: ActiveTaskEntity,
+    scanType: ExpectedScanType,
+  ): Promise<AggregationInfoDto> {
     const packaging = await this.aggregationRepository.searchPackageInfo(
       activeTask,
       packageLabel,
@@ -134,7 +156,6 @@ export class AggregationService {
         break;
 
       case ExpectedScanType.PALLET_LABEL:
-        // У паллеты нет родительского контейнера.
         break;
     }
 
@@ -142,7 +163,6 @@ export class AggregationService {
 
     return {
       scanType,
-      code: packageLabel,
       number: this.getContainerNumber(packageLabel),
       parents,
       contentsCount,

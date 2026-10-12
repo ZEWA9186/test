@@ -36,22 +36,22 @@ export class AggregationController {
     @Param('id', ParseIntPipe) tsdId: number,
     @Body() body: { code: string },
   ) {
-    return await this.aggregationService.searchProductInfo(tsdId, body.code);
+    return await this.aggregationService.searchInfo(tsdId, body.code);
   }
 
-  @Post(':id/search-package')
+  @Post(':id/delete-package')
   @HttpCode(HttpStatus.OK)
-  async searchPackageInfo(
+  async deletePackage(
     @Param('id', ParseIntPipe) tsdId: number,
     @Body() body: { packageLabel: string },
   ) {
-    return await this.aggregationService.searchPackageInfo(tsdId, body.packageLabel);
+    await this.aggregationService.deletePackage(body.packageLabel, tsdId);
   }
 
   @Post(':id/delete-code')
   @HttpCode(HttpStatus.OK)
   async deleteCode(@Param('id', ParseIntPipe) tsdId: number, @Body() body: { code: string }) {
-    return await this.aggregationService.deleteCode(body.code, tsdId);
+    await this.aggregationService.deleteCode(body.code, tsdId);
   }
 
   @Get()

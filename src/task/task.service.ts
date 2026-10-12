@@ -156,6 +156,14 @@ export class TaskService {
     await this.activeTaskRepository.save(activeTask);
   }
 
+  async getActiveTaskIdByTsdId(tsdId: number): Promise<number> {
+    const activeTask = await this.activeTaskRepository.findOne({ where: { tsdId } });
+    if (!activeTask) {
+      throw new BadRequestException('Нет активной задачи');
+    }
+    return activeTask.task.id;
+  }
+
   async getProductsInBigBox(id: number): Promise<number> {
     const task = await this.taskRepository.findOne({
       where: { id },

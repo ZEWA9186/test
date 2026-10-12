@@ -23,6 +23,7 @@ export class TaskController {
 
   @Get('tsd/:tsdId/in-work')
   async getTaskInWorkForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
+    console.log(tsdId);
     return await this.taskService.getTaskInWorkForTsd(tsdId);
   }
 
@@ -62,5 +63,11 @@ export class TaskController {
     @Body('tsdId', ParseIntPipe) tsdId: number,
   ) {
     await this.taskService.startTask(tsdId, taskId);
+  }
+
+  @Get('/tsd/active/:tsdId')
+  @HttpCode(HttpStatus.OK)
+  async activeTask(@Param('id', ParseIntPipe) id: number) {
+    return await this.taskService.getActiveTaskIdByTsdId(id);
   }
 }
