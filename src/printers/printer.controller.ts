@@ -53,7 +53,7 @@ export class PrinterController {
    * taskId — задача.
    * Количество продукции берётся из task.piecesPerSmallBox.
    */
-  @Post('print-box')
+  @Post('print-small-box')
   async printBox(
     @Body()
     body: {
@@ -86,7 +86,7 @@ export class PrinterController {
    * taskId — задача.
    * Количество продукции берётся из task.piecesPerBigBox.
    */
-  @Post('print-big-box')
+  @Post('print-box')
   async printBigBox(
     @Body()
     body: {

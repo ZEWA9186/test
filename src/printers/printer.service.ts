@@ -2,7 +2,7 @@ import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/c
 
 import { Logger } from 'winston';
 
-import { printLabelBox, printLabelPallet } from './printer.utils';
+import { printLabelBox, printLabelPallet, printLabelSmallBox } from './printer.utils';
 
 import { TemplateService } from '../template/template.service';
 import { printerLogger } from '../logger-winston/winston.config';
@@ -160,7 +160,7 @@ export class PrinterService implements OnModuleInit {
     const printerName = process.env.PRINTER_NAME_1 || '';
 
     try {
-      await printLabelBox(
+      await printLabelSmallBox(
         boxNumber,
         task.piecesPerSmallBox,
         printer,

@@ -206,28 +206,46 @@ export class AggregationRepository {
     }
   }
 
-  async deleteProductAndResetExpectedScan(tsdId: number, code: string): Promise<ActiveTaskEntity> {
-    const result = await this.packagingRepository.delete({ code, tsdId });
+  async deleteProductAndResetExpectedScan(tsdId: number, code: string): Promise<string> {
+    const result = await this.packagingRepository
+      .createQueryBuilder()
+      .delete()
+      .from(PackagingEntity)
+      .where('tsd_id = :tsdId', { tsdId })
+      .andWhere('code = :code', { code })
+      .returning(['code'])
+      .execute();
 
-    if (!result.affected) {
+    const deletedCode = result.raw[0]?.code as string | undefined;
+
+    if (!deletedCode) {
       throw new NotFoundException(`Код ${code} не найден для ТСД ${tsdId}`);
     }
 
     const activeTask = await this.getActiveTask(tsdId);
     activeTask.expectedScan = ExpectedScanType.PRODUCT;
 
-    return this.saveActiveTask(activeTask);
+    await this.saveActiveTask(activeTask);
+
+    return deletedCode;
   }
 
-  async deletePackageAndResetExpectedScan(
-    tsdId: number,
-    packageLabel: string,
-  ): Promise<ActiveTaskEntity> {
-    const result = await this.packagingRepository.delete([
-      { tsdId, smallBoxLabel: packageLabel },
-      { tsdId, bigBoxLabel: packageLabel },
-      { tsdId, palletLabel: packageLabel },
-    ]);
+  async deletePackageAndResetExpectedScan(tsdId: number, packageLabel: string): Promise<string[]> {
+    const result = await this.packagingRepository
+      .createQueryBuilder()
+      .delete()
+      .from(PackagingEntity)
+      .where('tsd_id = :tsdId', { tsdId })
+      .andWhere(
+        `(
+      small_box_label = :packageLabel OR
+      big_box_label = :packageLabel OR
+      pallet_label = :packageLabel
+    )`,
+        { packageLabel },
+      )
+      .returning(['code'])
+      .execute();
 
     if (!result.affected) {
       throw new NotFoundException(`Код ${packageLabel} не найден для ТСД ${tsdId}`);
@@ -236,7 +254,9 @@ export class AggregationRepository {
     const activeTask = await this.getActiveTask(tsdId);
     activeTask.expectedScan = ExpectedScanType.PRODUCT;
 
-    return this.saveActiveTask(activeTask);
+    await this.saveActiveTask(activeTask);
+
+    return result.raw.map((row: { code: string }) => row.code);
   }
 
   async addProductIntoPackage(

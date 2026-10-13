@@ -8,8 +8,9 @@ export class AggregationParentsDto {
 
 export class AggregationInfoDto {
   scanType: ExpectedScanType;
-  number: string | null;
+  label: string | null;
   parents: AggregationParentsDto;
   contentsCount: number | null;
   contentsType: ExpectedScanType | null;
+  aggregationLvl: number;
 }

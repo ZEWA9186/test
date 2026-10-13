@@ -67,7 +67,7 @@ export class TaskController {
 
   @Get('/tsd/active/:tsdId')
   @HttpCode(HttpStatus.OK)
-  async activeTask(@Param('id', ParseIntPipe) id: number) {
+  async activeTask(@Param('tsdId', ParseIntPipe) id: number) {
     return await this.taskService.getActiveTaskIdByTsdId(id);
   }
 }

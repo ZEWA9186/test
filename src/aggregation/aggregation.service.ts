@@ -21,6 +21,8 @@ export class AggregationService {
 
   async processScan(tsdId: number, code: string) {
     //TODO проверка задания
+    //TODO транзакция
+
     const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
 
     const scanType = this.gs1Parser.getScanType(code, activeTask);
@@ -42,11 +44,22 @@ export class AggregationService {
   }
 
   async deleteCode(code: string, tsdId: number) {
-    await this.aggregationRepository.deleteProductAndResetExpectedScan(tsdId, code);
+    //TODO транзакция
+
+    const deletedCode = await this.aggregationRepository.deleteProductAndResetExpectedScan(
+      tsdId,
+      code,
+    );
+    await this.codeService.deleteCode(deletedCode);
   }
 
   async deletePackage(packageLabel: string, tsdId: number) {
-    await this.aggregationRepository.deletePackageAndResetExpectedScan(tsdId, packageLabel);
+    //TODO транзакция
+    const codes = await this.aggregationRepository.deletePackageAndResetExpectedScan(
+      tsdId,
+      packageLabel,
+    );
+    await this.codeService.batchDeleteCodes(codes);
   }
 
   async addProductIntoPackage(packageLabel: string, tsdId: number, code: string) {
@@ -65,7 +78,7 @@ export class AggregationService {
     if (productType !== ExpectedScanType.PRODUCT) {
       throw new BadRequestException('Ожидался товарный код');
     }
-
+    //TODO транзакция
     try {
       await this.codeService.validateAndSaveCode(code);
     } catch (error) {
@@ -104,14 +117,15 @@ export class AggregationService {
 
     return {
       scanType,
-      number: null,
+      label: code,
       parents: {
-        smallBox: this.getContainerNumber(product.smallBoxLabel),
-        bigBox: this.getContainerNumber(product.bigBoxLabel),
-        pallet: this.getContainerNumber(product.palletLabel),
+        smallBox: product.smallBoxLabel,
+        bigBox: product.bigBoxLabel,
+        pallet: product.palletLabel,
       },
       contentsCount: null,
       contentsType: null,
+      aggregationLvl: activeTask.aggregationLvl,
     };
   }
 
@@ -142,8 +156,8 @@ export class AggregationService {
       case ExpectedScanType.SMALL_BOX_LABEL:
         parents = {
           smallBox: null,
-          bigBox: this.getContainerNumber(packaging.bigBoxLabel),
-          pallet: this.getContainerNumber(packaging.palletLabel),
+          bigBox: packaging.bigBoxLabel,
+          pallet: packaging.palletLabel,
         };
         break;
 
@@ -151,7 +165,7 @@ export class AggregationService {
         parents = {
           smallBox: null,
           bigBox: null,
-          pallet: this.getContainerNumber(packaging.palletLabel),
+          pallet: packaging.palletLabel,
         };
         break;
 
@@ -163,18 +177,11 @@ export class AggregationService {
 
     return {
       scanType,
-      number: this.getContainerNumber(packageLabel),
+      label: packageLabel,
       parents,
       contentsCount,
       contentsType,
+      aggregationLvl: activeTask.aggregationLvl,
     };
-  }
-
-  private getContainerNumber(label: string | null): string | null {
-    if (label === null) {
-      return null;
-    }
-
-    return this.gs1Parser.getContainerNumber(label);
   }
 }

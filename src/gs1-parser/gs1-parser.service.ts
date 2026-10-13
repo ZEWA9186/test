@@ -118,7 +118,7 @@ export class Gs1ParserService {
   }
 
   private extractContainerNumber(sscc: string): string {
-    const serialReference = sscc.substring(13, 19);
+    const serialReference = sscc.substring(12, 19);
     return serialReference.replace(/^0+/, '') || '0';
   }
 

@@ -56,6 +56,80 @@ export async function printLabelBox(
       modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
     });
 
+    const sscc = generateLabel('8', `${boxNumber}`);
+
+    modifiedData = modifiedData
+      .replace('<nnn_package>', `${boxNumber}`)
+      .replace('<nnn_pallet>', `${boxNumber}`)
+      .replace('<nnn_pieces_per_package>', `${countInBox}`)
+      .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
+      .replace('<nnn_netto_box_kg>', `${getBoxNettoKG(task.nettoUnit, countInBox)}`)
+      .replace('<nnn_netto_unit_kg>', `${getNettoUnitKG(task.nettoUnit)}`)
+      .replace('<gs1128_dm>', sscc);
+    console.log('----------=', modifiedData);
+
+    const encodedData = iconv.encode(modifiedData, encoding);
+    const newFileName = `${getTemplateDirectory()}\\${Date.now()}.prn`.replace(/\//g, '\\');
+
+    await fs.promises.writeFile(newFileName, encodedData);
+    const command = `COPY /B ${newFileName} \\\\${PCName}\\${printerName}`;
+    // console.log(command);
+    const { stderr } = await execAsync(command);
+    if (stderr) {
+      logger.error('Ошибка отправки файла на печать:', stderr);
+      return;
+    }
+    setTimeout(async () => {
+      try {
+        await fs.promises.unlink(newFileName);
+        logger.info('Файл успешно удален');
+      } catch (unlinkErr) {
+        logger.error('Ошибка удаления файла:', unlinkErr);
+      }
+    }, 500);
+    logger.info('Принтер: Печать коробки завершена');
+  } catch (err) {
+    logger.error('Принтер: Ошибка печати', err);
+  }
+}
+
+export async function printLabelSmallBox(
+  boxNumber: number,
+  countInBox: number,
+  printer: any,
+  boxTemplate: any[],
+  task: any,
+  logger: Logger,
+  printerName: any,
+) {
+  const PCName = process.env.PC_NAME || '';
+  console.log('===============printerName', printerName);
+
+  if (!printer) {
+    logger.warn('Принтер: Принтер не подключен');
+    return;
+  }
+  logger.warn(`Печать этикетки для коробки ${boxNumber}`);
+  if (!task.smallBoxLabel) {
+    logger.warn('Принтер: Не задана этикетка коробки');
+    return;
+  }
+  try {
+    printer.clear();
+    const encoding = EncodingType.WIN1251;
+    const decoding = EncodingType.WIN1251;
+    console.log('--------encoding,decoding ----box', encoding, decoding, printerName);
+    const label = task.smallBoxLabel;
+    const data = await fs.promises.readFile(`${getTemplateDirectory()}/${label}.prn`);
+    const decodedData = iconv.decode(data, decoding);
+    let modifiedData = decodedData;
+    const taskKeys = Object.keys(task);
+    taskKeys.forEach((key) => {
+      const placeholder = `<${key}>`;
+      const value = task[key];
+      modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
+    });
+
     const sscc = generateLabel('7', `${boxNumber}`);
 
     modifiedData = modifiedData

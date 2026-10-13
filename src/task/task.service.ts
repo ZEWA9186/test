@@ -150,18 +150,29 @@ export class TaskService {
         piecesPerPallet: task.piecesPerPallet,
       });
     }
+    task.isActive = true;
 
     activeTask.task = task;
-
+    await this.taskRepository.save(task);
     await this.activeTaskRepository.save(activeTask);
   }
 
   async getActiveTaskIdByTsdId(tsdId: number): Promise<number> {
-    const activeTask = await this.activeTaskRepository.findOne({ where: { tsdId } });
-    if (!activeTask) {
+    const result = await this.activeTaskRepository
+      .createQueryBuilder('activeTask')
+      .select('activeTask.task_id', 'taskId')
+      .where('activeTask.tsdId = :tsdId', { tsdId })
+      .getRawOne<{ taskId: number | null }>();
+
+    if (!result) {
       throw new BadRequestException('Нет активной задачи');
     }
-    return activeTask.task.id;
+
+    if (result.taskId == null) {
+      throw new BadRequestException('Для ТСД не назначена задача');
+    }
+
+    return Number(result.taskId);
   }
 
   async getProductsInBigBox(id: number): Promise<number> {
