@@ -1,90 +1,86 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { InternalServerErrorException, Injectable } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 
-import {
-  ActiveTaskEntity,
-  ExpectedScanType,
-} from '../entities/active-task.entity';
-
+import { ActiveTaskEntity, ExpectedScanType } from '../entities/active-task.entity';
 import { AggregationRepository } from '../repository/aggregation.repository';
 
 @Injectable()
 export class AggregationContainerService {
   constructor(private readonly aggregationRepository: AggregationRepository) {}
 
-  async closeContainer(activeTask: ActiveTaskEntity, code: string) {
-    try {
-      switch (activeTask.expectedScan) {
-        case ExpectedScanType.SMALL_BOX_LABEL:
-          return this.closeSmallBox(activeTask, code);
+  async closeContainer(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
+    switch (activeTask.expectedScan) {
+      case ExpectedScanType.SMALL_BOX_LABEL:
+        return this.closeSmallBox(activeTask, code, manager);
 
-        case ExpectedScanType.BIG_BOX_LABEL:
-          return this.closeBigBox(activeTask, code);
+      case ExpectedScanType.BIG_BOX_LABEL:
+        return this.closeBigBox(activeTask, code, manager);
 
-        case ExpectedScanType.PALLET_LABEL:
-          return this.closePallet(activeTask, code);
+      case ExpectedScanType.PALLET_LABEL:
+        return this.closePallet(activeTask, code, manager);
 
-        default:
-          throw new InternalServerErrorException(
-            `Некорректное состояние: ${activeTask.expectedScan}`,
-          );
-      }
-    } catch (err: any) {
-      throw new InternalServerErrorException('Ошибка привязки этикеток');
+      default:
+        throw new InternalServerErrorException(
+          `Некорректное состояние: ${activeTask.expectedScan}`,
+        );
     }
   }
 
-  private async closeSmallBox(activeTask: ActiveTaskEntity, code: string) {
+  private async closeSmallBox(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
     await this.aggregationRepository.setContainerLabel(
       activeTask,
       ExpectedScanType.SMALL_BOX_LABEL,
       code,
+      manager,
     );
 
-    const smallBoxCount =
-      await this.aggregationRepository.getClosedSmallBoxCount(activeTask);
-    if (smallBoxCount >= activeTask.piecesPerBigBox) {
-      activeTask.expectedScan = ExpectedScanType.BIG_BOX_LABEL;
-    } else {
-      activeTask.expectedScan = ExpectedScanType.PRODUCT;
-    }
+    const smallBoxCount = await this.aggregationRepository.getClosedSmallBoxCount(
+      activeTask,
+      manager,
+    );
 
-    await this.aggregationRepository.saveActiveTask(activeTask);
+    activeTask.expectedScan =
+      smallBoxCount >= activeTask.piecesPerBigBox
+        ? ExpectedScanType.BIG_BOX_LABEL
+        : ExpectedScanType.PRODUCT;
+
+    await this.aggregationRepository.saveActiveTask(activeTask, manager);
+
     return activeTask.expectedScan;
   }
 
-  private async closeBigBox(activeTask: ActiveTaskEntity, code: string) {
+  private async closeBigBox(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
     await this.aggregationRepository.setContainerLabel(
       activeTask,
       ExpectedScanType.BIG_BOX_LABEL,
       code,
+      manager,
     );
 
-    const bigBoxCount =
-      await this.aggregationRepository.getClosedBigBoxCount(activeTask);
+    const bigBoxCount = await this.aggregationRepository.getClosedBigBoxCount(activeTask, manager);
 
-    if (bigBoxCount >= activeTask.piecesPerPallet) {
-      activeTask.expectedScan = ExpectedScanType.PALLET_LABEL;
-    } else {
-      activeTask.expectedScan = ExpectedScanType.PRODUCT;
-    }
-    await this.aggregationRepository.saveActiveTask(activeTask);
+    activeTask.expectedScan =
+      bigBoxCount >= activeTask.piecesPerPallet
+        ? ExpectedScanType.PALLET_LABEL
+        : ExpectedScanType.PRODUCT;
+
+    await this.aggregationRepository.saveActiveTask(activeTask, manager);
+
     return activeTask.expectedScan;
   }
 
-  private async closePallet(activeTask: ActiveTaskEntity, code: string) {
+  private async closePallet(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
     await this.aggregationRepository.setContainerLabel(
       activeTask,
       ExpectedScanType.PALLET_LABEL,
       code,
+      manager,
     );
 
     activeTask.expectedScan = ExpectedScanType.PRODUCT;
 
-    await this.aggregationRepository.saveActiveTask(activeTask);
+    await this.aggregationRepository.saveActiveTask(activeTask, manager);
+
     return activeTask.expectedScan;
   }
 }

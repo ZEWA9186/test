@@ -10,36 +10,36 @@ export class LastPackageService {
     private lastPackageEntityRepository: Repository<LastPackageEntity>,
   ) {}
 
-  async updateSmallBoxNumber() {
+  async updateSmallBoxNumber(): Promise<number> {
     const result = await this.lastPackageEntityRepository
       .createQueryBuilder()
       .update(LastPackageEntity)
-      .set({ smallBoxNumber: () => '"smallBoxNumber" + 1' })
-      .returning('smallBoxNumber')
+      .set({ smallBoxNumber: () => '"small_box_number" + 1' })
+      .returning('small_box_number')
       .execute();
 
-    return result.raw[0].smallBoxNumber;
+    return Number(result.raw[0].small_box_number);
   }
 
-  async updateBigBoxNumber() {
+  async updateBigBoxNumber(): Promise<number> {
     const result = await this.lastPackageEntityRepository
       .createQueryBuilder()
       .update(LastPackageEntity)
-      .set({ bigBoxNumber: () => '"bigBoxNumber" + 1' })
-      .returning('bigBoxNumber')
+      .set({ bigBoxNumber: () => '"big_box_number" + 1' })
+      .returning('big_box_number')
       .execute();
 
-    return result.raw[0].bigBoxNumber;
+    return Number(result.raw[0].big_box_number);
   }
 
-  async updatePalletNumber() {
+  async updatePalletNumber(): Promise<number> {
     const result = await this.lastPackageEntityRepository
       .createQueryBuilder()
       .update(LastPackageEntity)
-      .set({ palletNumber: () => '"palletNumber" + 1' })
-      .returning('palletNumber')
+      .set({ palletNumber: () => '"pallet_number" + 1' })
+      .returning('pallet_number')
       .execute();
 
-    return result.raw[0].palletNumber;
+    return Number(result.raw[0].pallet_number);
   }
 }

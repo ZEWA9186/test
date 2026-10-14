@@ -45,13 +45,22 @@ export class AggregationController {
     @Param('id', ParseIntPipe) tsdId: number,
     @Body() body: { packageLabel: string },
   ) {
-    await this.aggregationService.deletePackage(body.packageLabel, tsdId);
+    await this.aggregationService.deletePackage(body.packageLabel);
+  }
+
+  @Post(':id/move-box')
+  @HttpCode(HttpStatus.OK)
+  async moveBox(
+    @Param('id', ParseIntPipe) tsdId: number,
+    @Body() body: { boxLabel: string; palletLabel: string },
+  ) {
+    await this.aggregationService.moveBox(body.boxLabel, body.palletLabel, tsdId);
   }
 
   @Post(':id/delete-code')
   @HttpCode(HttpStatus.OK)
   async deleteCode(@Param('id', ParseIntPipe) tsdId: number, @Body() body: { code: string }) {
-    await this.aggregationService.deleteCode(body.code, tsdId);
+    await this.aggregationService.deleteCode(body.code);
   }
 
   @Get()

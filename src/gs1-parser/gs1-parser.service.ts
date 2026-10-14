@@ -121,7 +121,6 @@ export class Gs1ParserService {
     const serialReference = sscc.substring(12, 19);
     return serialReference.replace(/^0+/, '') || '0';
   }
-
   private validateGtinFormat(gtin: string) {
     if (!/^\d{14}$/.test(gtin)) {
       this.throwGs1Error(`Некорректный GTIN`);

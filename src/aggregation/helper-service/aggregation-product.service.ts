@@ -1,99 +1,57 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 
 import { ActiveTaskEntity, ExpectedScanType } from '../entities/active-task.entity';
 import { AggregationRepository } from '../repository/aggregation.repository';
 import { AggregationRules } from './aggregation.rules';
-import { CodeService } from '../../code/code.service';
 
 @Injectable()
 export class AggregationProductService {
-  constructor(
-    private readonly aggregationRepository: AggregationRepository,
-    private readonly codeService: CodeService,
-  ) {}
+  constructor(private readonly aggregationRepository: AggregationRepository) {}
 
-  async addProduct(activeTask: ActiveTaskEntity, code: string) {
-    try {
-      await this.aggregationRepository.addProduct(activeTask, code);
-      const count = await this.aggregationRepository.getOpenProductCount(activeTask);
+  async addProduct(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
+    await this.aggregationRepository.addProduct(activeTask, code, manager);
 
-      const limit = AggregationRules.getProductLimit(activeTask);
+    const count = await this.aggregationRepository.getOpenProductCount(activeTask, manager);
 
-      if (count < limit) {
-        return activeTask.expectedScan;
-      }
+    const limit = AggregationRules.getProductLimit(activeTask);
 
-      activeTask.expectedScan = AggregationRules.getNextContainerType(activeTask);
-
-      await this.aggregationRepository.saveActiveTask(activeTask);
-
+    if (count < limit) {
       return activeTask.expectedScan;
-    } catch (err: any) {
-      console.log(err);
-      throw new InternalServerErrorException('Не удалось добавить продукт');
     }
+
+    activeTask.expectedScan = AggregationRules.getNextContainerType(activeTask);
+
+    await this.aggregationRepository.saveActiveTask(activeTask, manager);
+
+    return activeTask.expectedScan;
   }
+
   async addProductIntoPackage(
     activeTask: ActiveTaskEntity,
     code: string,
     packageLabel: string,
     packageType: ExpectedScanType,
+    manager: EntityManager,
   ) {
     const limit = AggregationRules.getProductLimit(activeTask);
 
     const currentCount = await this.aggregationRepository.countProductsInPackage(
       activeTask,
       packageLabel,
+      manager,
     );
 
     if (currentCount >= limit) {
       throw new BadRequestException(`Тара ${packageLabel} заполнена: ${currentCount}/${limit}`);
     }
 
-    const packaging = await this.aggregationRepository.addProductIntoPackage(
+    await this.aggregationRepository.addProductIntoPackage(
       activeTask,
       code,
       packageLabel,
       packageType,
+      manager,
     );
-
-    await this.codeService.validateAndSaveCode(code);
-
-    const productCount = await this.aggregationRepository.countProductsInPackage(
-      activeTask,
-      packageLabel,
-    );
-
-    if (productCount < limit) {
-      return activeTask.expectedScan;
-    }
-
-    const hasParent =
-      packageType === ExpectedScanType.SMALL_BOX_LABEL
-        ? Boolean(packaging.bigBoxLabel || packaging.palletLabel)
-        : packageType === ExpectedScanType.BIG_BOX_LABEL
-          ? Boolean(packaging.palletLabel)
-          : false;
-
-    if (hasParent) {
-      activeTask.expectedScan = ExpectedScanType.PRODUCT;
-    } else {
-      let closedContainerCount = 0;
-
-      if (activeTask.aggregationLvl === 2) {
-        closedContainerCount = await this.aggregationRepository.getClosedBigBoxCount(activeTask);
-      } else if (activeTask.aggregationLvl === 3) {
-        closedContainerCount = await this.aggregationRepository.getClosedSmallBoxCount(activeTask);
-      }
-
-      activeTask.expectedScan = AggregationRules.getExpectedScanAfterPackage(
-        activeTask,
-        closedContainerCount,
-      );
-    }
-
-    await this.aggregationRepository.saveActiveTask(activeTask);
-
-    return activeTask.expectedScan;
   }
 }

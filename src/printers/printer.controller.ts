@@ -70,7 +70,7 @@ export class PrinterController {
    * Номер коробки получает PrinterService
    * через LastPackageService.
    */
-  @Post('print-all-box')
+  @Post('print-all-small-box')
   async printAllBox(@Body('taskId') taskId: number): Promise<void> {
     await this.printerService.printAllSmallBoxLabel(taskId);
   }
@@ -100,7 +100,7 @@ export class PrinterController {
   /**
    * Печать всех больших коробок.
    */
-  @Post('print-all-big-box')
+  @Post('print-all-box')
   async printAllBigBox(@Body('taskId') taskId: number): Promise<void> {
     await this.printerService.printAllBigBoxLabel(taskId);
   }

@@ -91,7 +91,9 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов в малой коробке');
     }
 
-    for (let i = 0; i < task.piecesPerSmallBox; i++) {
+    const count = (await this.taskService.getProductsCount(taskId)) / task.piecesPerSmallBox;
+
+    for (let i = 0; i < count; i++) {
       const boxNumber = await this.lastPackageService.updateSmallBoxNumber();
       await this.printSmallBoxLabel(boxNumber, task.id);
     }
@@ -108,8 +110,13 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов в большой коробке');
     }
 
-    for (let i = 0; i < task.piecesPerBigBox; i++) {
-      const boxNumber = await this.lastPackageService.updateBigBoxNumber();
+    const count =
+      (await this.taskService.getProductsCount(taskId)) /
+      (await this.taskService.getProductsInBigBox(taskId));
+
+    for (let i = 0; i < count; i++) {
+      const boxNumber: number = await this.lastPackageService.updateBigBoxNumber();
+      console.log(boxNumber, task.id);
       await this.printBigBoxLabel(boxNumber, task.id);
     }
   }
@@ -125,7 +132,11 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов на паллете');
     }
 
-    for (let i = 0; i < task.piecesPerPallet; i++) {
+    const count =
+      (await this.taskService.getProductsCount(taskId)) /
+      (await this.taskService.getProductsInPalletId(taskId));
+
+    for (let i = 0; i < count; i++) {
       const palletNumber = await this.lastPackageService.updatePalletNumber();
       await this.printPalletLabel(palletNumber, task.id);
     }

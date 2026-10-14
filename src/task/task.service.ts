@@ -184,6 +184,10 @@ export class TaskService {
     } else throw new NotFoundException(`Неправильная конфигурация задания ${id}`);
   }
 
+  async getProductsCount(id: number): Promise<number> {
+    return this.taskCodesRepository.count({ where: { taskId: id } });
+  }
+
   async getProductsInPalletId(id: number): Promise<number> {
     const task = await this.taskRepository.findOne({
       where: { id },
