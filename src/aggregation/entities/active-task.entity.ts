@@ -1,5 +1,4 @@
-import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { TaskEntity } from '../../task/entities/task.entity';
+import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 export enum ExpectedScanType {
   PRODUCT = 'PRODUCT',
@@ -12,6 +11,9 @@ export enum ExpectedScanType {
 export class ActiveTaskEntity {
   @PrimaryColumn({ name: 'tsd_id', type: 'int' })
   tsdId: number;
+
+  @Column({ name: 'task_id', type: 'int', nullable: true })
+  taskId: number | null;
 
   @Column({ name: 'gtin', nullable: true })
   gtin: string;
@@ -36,11 +38,11 @@ export class ActiveTaskEntity {
   @Column({ name: 'aggregation_lvl', nullable: true, type: 'int' })
   aggregationLvl: number;
 
-  //TODO Возможно onDelete CASCADE
-  @ManyToOne(() => TaskEntity, (task) => task.activeTasks, {
+  @Column({
+    name: 'packaging_table_name',
+    type: 'varchar',
+    length: 63,
     nullable: true,
-    onDelete: 'SET NULL',
   })
-  @JoinColumn({ name: 'task_id' })
-  task: TaskEntity;
+  packagingTableName: string | null;
 }

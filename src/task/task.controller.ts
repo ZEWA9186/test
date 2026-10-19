@@ -21,9 +21,27 @@ export class TaskController {
     return await this.taskService.getAllTask();
   }
 
+  @Get('history')
+  async getHistoryTasks() {
+    return await this.taskService.getHistoryTasks();
+  }
+
+  @Get('tsd/:tsdId/history')
+  async getHistoryTasksForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
+    return await this.taskService.getTaskHistoryForTsd(tsdId);
+  }
+
+  @Post('history/:id/start')
+  @HttpCode(HttpStatus.OK)
+  async startHistoryTask(
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body('tsdId', ParseIntPipe) tsdId: number,
+  ) {
+    return await this.taskService.startHistoryTask(tsdId, taskId);
+  }
+
   @Get('tsd/:tsdId/in-work')
   async getTaskInWorkForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
-    console.log(tsdId);
     return await this.taskService.getTaskInWorkForTsd(tsdId);
   }
 
@@ -65,9 +83,9 @@ export class TaskController {
     await this.taskService.startTask(tsdId, taskId);
   }
 
-  @Get('/tsd/active/:tsdId')
+  @Get('tsd/active/:tsdId')
   @HttpCode(HttpStatus.OK)
-  async activeTask(@Param('tsdId', ParseIntPipe) id: number) {
-    return await this.taskService.getActiveTaskIdByTsdId(id);
+  async activeTask(@Param('tsdId', ParseIntPipe) tsdId: number) {
+    return await this.taskService.getActiveTaskIdByTsdId(tsdId);
   }
 }

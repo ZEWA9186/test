@@ -1,134 +1,191 @@
-import { Injectable, NotFoundException, ConflictException, Inject } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './user.entity';
 import * as bcrypt from 'bcryptjs';
-import { Logger } from 'winston';
-import { usersLogger } from '../logger-winston/winston.config';
 
+import { User } from './user.entity';
+//TODO Тут можн чуть подумать
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @Inject('winston') private readonly logger: Logger = usersLogger,
   ) {}
 
   async createUser(username: string, password: string, role: string): Promise<Partial<User>> {
-    // console.log('createUser------__________', role);
+    const cleanUsername = username?.trim();
 
-    this.logger.info(`Авторизация: Создание пользователя с именем: ${username}`);
-    // Валидация параметров
-    if (!username || !password || !role) {
-      this.logger.warn(
-        'Авторизация: Имя пользователя, пароль и роль являются обязательными параметрами',
-      );
-      throw new ConflictException('Имя и пароль обязательные параметры');
+    if (!cleanUsername || !password || !role) {
+      throw new BadRequestException('Имя пользователя, пароль и роль обязательны');
     }
 
-    // Проверка на существование пользователя
     const existingUser = await this.userRepository.findOne({
-      where: { username },
+      where: { username: cleanUsername },
     });
+
     if (existingUser) {
-      this.logger.warn(`Авторизация: Пользователь с именем ${username} уже существует`);
       throw new ConflictException('Пользователь с таким именем уже существует');
     }
 
-    // Хэширование пароля
-    const hashedPassword = await bcrypt.hash(password, 10); // 10 - это количество раундов хэширования
+    if ((await this.userRepository.count()) >= 13) {
+      throw new BadRequestException('Все пользователи уже назначены');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = this.userRepository.create({
-      username,
+      username: cleanUsername,
       password: hashedPassword,
       role,
     });
-    const { password: _, ...result } = await this.userRepository.save(user);
-    this.logger.info(`Авторизация: Пользователь с именем ${username} успешно создан`);
-    return result;
+
+    const savedUser = await this.userRepository.save(user);
+
+    return this.toPublicUser(savedUser);
   }
 
   async authUser(username: string, password: string): Promise<Partial<User>> {
-    this.logger.info(`Авторизация: Аутентификация пользователя с именем: ${username}`);
-    // Валидация параметров
     if (!username || !password) {
-      this.logger.warn('Авторизация: Имя пользователя и пароль являются обязательными параметрами');
-      throw new ConflictException('Имя и пароль обязательные параметры');
+      throw new BadRequestException('Имя и пароль обязательны');
     }
 
-    // Поиск пользователя
-    const user = await this.userRepository.findOne({ where: { username } });
+    const user = await this.userRepository.findOne({
+      where: { username: username.trim() },
+    });
+
     if (!user) {
-      this.logger.warn(`Авторизация: Пользователь с именем ${username} не найден`);
       throw new NotFoundException('Пользователь не найден');
     }
 
-    // Сравнение паролей
     const isPasswordMatching = await bcrypt.compare(password, user.password);
+
     if (!isPasswordMatching) {
-      this.logger.warn('Авторизация: Неверный пароль');
       throw new ConflictException('Неверный пароль');
     }
+    if (user.isActive) {
+      throw new BadRequestException(`Пользователь ${user.username} уже активен`);
+    }
+    user.isActive = true;
+    await this.userRepository.save(user);
 
-    // Возвращаем пользователя (или его данные, исключая пароль)
-    const { password: _, ...result } = user; // Убираем пароль из возвращаемых данных
-    this.logger.info(`Авторизация: Пользователь с именем ${username} успешно аутентифицирован`);
-    return result;
+    return this.toPublicUser(user);
+  }
+
+  async logOut(id: number): Promise<void> {
+    await this.userRepository.update({ id }, { isActive: false });
   }
 
   async findAll(page: number, limit: number): Promise<{ data: Partial<User>[]; total: number }> {
-    this.logger.info('Авторизация: Получение всех пользователей');
     const [users, total] = await this.userRepository.findAndCount({
       skip: (page - 1) * limit,
       take: limit,
     });
 
-    // Убираем пароли из возвращаемых данных
-    const usersWithoutPasswords = users.map(({ password, ...rest }) => rest);
-
-    return { data: usersWithoutPasswords, total };
+    return {
+      data: users.map((user) => this.toPublicUser(user)),
+      total,
+    };
   }
 
-  async findOne(id: number): Promise<User> {
-    this.logger.info(`Авторизация: Получение пользователя с ID: ${id}`);
-    const user = await this.userRepository.findOne({ where: { id } });
-    if (!user) {
-      this.logger.warn(`Авторизация: Пользователь с ID ${id} не найден`);
-      throw new NotFoundException(`Пользователь с ID ${id} не найден`);
-    }
-    return user;
+  async findOne(id: number): Promise<Partial<User>> {
+    const user = await this.findUserEntity(id);
+
+    return this.toPublicUser(user);
   }
 
   async findByUsername(username: string): Promise<Partial<User>> {
-    this.logger.info(`Авторизация: Получение пользователя с именем: ${username}`);
-    const user = await this.userRepository.findOne({ where: { username } });
+    const user = await this.userRepository.findOne({
+      where: { username },
+    });
+
     if (!user) {
-      this.logger.warn(`Авторизация: Пользователь с именем ${username} не найден`);
       throw new NotFoundException(`Пользователь с именем ${username} не найден`);
     }
 
-    // Убираем пароль из возвращаемых данных
-    const { password, ...result } = user;
-    return result;
+    return this.toPublicUser(user);
+  }
+
+  async findOperatorUsernames() {
+    const users = await this.userRepository.find({
+      where: {
+        role: 'operator',
+      },
+    });
+    return users.map((user) => ({
+      username: user.username,
+      id: user.id,
+    }));
   }
 
   async update(id: number, userData: Partial<User>): Promise<Partial<User>> {
-    this.logger.info(`Авторизация: Обновление пользователя с ID: ${id}`);
-    const user = await this.findOne(id); // Проверка существования
-    // Обновляем поля
-    Object.assign(user, userData);
+    const user = await this.findUserEntity(id);
+
+    // Обновляем имя, только если поле передано.
+    if (userData.username !== undefined) {
+      const username = userData.username.trim();
+
+      if (!username) {
+        throw new BadRequestException('Имя пользователя не может быть пустым');
+      }
+
+      if (username !== user.username) {
+        const existingUser = await this.userRepository.findOne({
+          where: { username },
+        });
+
+        if (existingUser && existingUser.id !== id) {
+          throw new ConflictException('Пользователь с таким именем уже существует');
+        }
+
+        user.username = username;
+      }
+    }
+
+    // Пустой или отсутствующий пароль означает, что менять его не нужно.
+    if (typeof userData.password === 'string' && userData.password.length > 0) {
+      user.password = await bcrypt.hash(userData.password, 10);
+    }
+
+    // Обновляем роль, если она передана.
+    if (userData.role !== undefined) {
+      user.role = userData.role;
+    }
+
+    if (userData.isActive !== undefined) {
+      user.isActive = userData.isActive;
+    }
+
     const updatedUser = await this.userRepository.save(user);
 
-    // Убираем пароль из возвращаемых данных
-    const { password, ...result } = updatedUser;
-    this.logger.info(`Авторизация: Пользователь с ID ${id} успешно обновлен`);
-    return result;
+    return this.toPublicUser(updatedUser);
   }
 
   async remove(id: number): Promise<void> {
-    this.logger.info(`Авторизация: Удаление пользователя с ID: ${id}`);
-    const user = await this.findOne(id); // Проверка существования
+    const user = await this.findUserEntity(id);
+
     await this.userRepository.remove(user);
-    this.logger.info(`Авторизация: Пользователь с ID ${id} успешно удален`);
+  }
+
+  private async findUserEntity(id: number): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`Пользователь с ID ${id} не найден`);
+    }
+
+    return user;
+  }
+
+  private toPublicUser(user: User): Partial<User> {
+    const { password: _password, ...result } = user;
+
+    return result;
   }
 }

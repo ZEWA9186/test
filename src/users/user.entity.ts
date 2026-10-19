@@ -7,10 +7,13 @@ export class User {
 
   @Column()
   username: string;
-
-  @Column()
+  //TODO Исправить под прод
+  @Column({ nullable: true })
   password: string;
 
   @Column()
   role: string; // например: 'admin', 'user', 'guest'
+
+  @Column({ name: 'is_active', nullable: true })
+  isActive: boolean;
 }

@@ -17,6 +17,8 @@ export const getTemplateDirectory = (): string => {
   return path.join(getAvailableFilesDirectory(), 'template_files');
 };
 
+export const getLocalReportsDirectory = (): string => getEnv('REPORT_DIRECTORY');
+
 export const getPostgresPath = (): string => getEnv('POSTGRES_PATH');
 
 export const getBackupDirectories = (): string[] => {
@@ -26,21 +28,12 @@ export const getBackupDirectories = (): string[] => {
     .filter(Boolean);
 };
 
-export function validateEnvironment(): void {
-  getAvailableFilesDirectory();
-  getJsonDirectory1S();
-  getJsonDirectory1STemplate();
-  getBackupDirectories();
-  // getPostgresPath();
-}
-
 export async function initDirectories(): Promise<void> {
-  validateEnvironment();
-
   const directories = [
     getJsonDirectory1S(),
     getJsonDirectory1STemplate(),
     getTemplateDirectory(),
+    getLocalReportsDirectory(),
     ...getBackupDirectories(),
   ];
 

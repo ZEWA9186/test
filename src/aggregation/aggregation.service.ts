@@ -11,6 +11,7 @@ import { AggregationInfoDto } from './dto/responce.dto';
 import { CodeService } from '../code/code.service';
 import { Gs1ParserService } from '../gs1-parser/gs1-parser.service';
 
+// TODO: логирование ручных операций и ошибок.
 @Injectable()
 export class AggregationService {
   constructor(
@@ -22,6 +23,7 @@ export class AggregationService {
     private readonly gs1Parser: Gs1ParserService,
   ) {}
 
+  // Обычный поток сканирования работает только с текущей фасовкой.
   async processScan(tsdId: number, code: string) {
     const { activeTask, scanType } = await this.getAndValidateActiveTask(tsdId, code);
 
@@ -33,22 +35,27 @@ export class AggregationService {
 
     return this.withTransaction(async (manager) => {
       await this.codeService.validateAndSaveCode(code, manager);
-
       return this.aggregationProductService.addProduct(activeTask, code, manager);
     });
   }
 
-  async deleteCode(code: string): Promise<void> {
+  async deleteCode(tsdId: number, code: string): Promise<void> {
     await this.withTransaction(async (manager) => {
-      const deletedCode = await this.aggregationRepository.deleteProduct(code, manager);
+      const activeTask = await this.getActiveTask(tsdId, manager);
+      const deletedCode = await this.aggregationRepository.deleteProduct(activeTask, code, manager);
 
       await this.codeService.deleteCode(deletedCode, manager);
     });
   }
 
-  async deletePackage(packageLabel: string): Promise<void> {
+  async deletePackage(tsdId: number, packageLabel: string): Promise<void> {
     await this.withTransaction(async (manager) => {
-      const codes = await this.aggregationRepository.deletePackage(packageLabel, manager);
+      const activeTask = await this.getActiveTask(tsdId, manager);
+      const codes = await this.aggregationRepository.deletePackage(
+        activeTask,
+        packageLabel,
+        manager,
+      );
 
       await this.codeService.batchDeleteCodes(codes, manager);
     });
@@ -56,7 +63,6 @@ export class AggregationService {
 
   async addProductIntoPackage(packageLabel: string, tsdId: number, code: string) {
     const activeTask = await this.getActiveTask(tsdId);
-
     const expectedPackageType = AggregationRules.getNextContainerType(activeTask);
     const packageType = this.validateScanType(
       packageLabel,
@@ -83,7 +89,9 @@ export class AggregationService {
   async moveBox(boxLabel: string, palletLabel: string, tsdId: number): Promise<void> {
     const activeTask = await this.getActiveTask(tsdId);
 
-    await this.aggregationRepository.moveBox(boxLabel, palletLabel, activeTask);
+    await this.withTransaction((manager) =>
+      this.aggregationRepository.moveBox(boxLabel, palletLabel, activeTask, manager),
+    );
   }
 
   async searchInfo(tsdId: number, code: string): Promise<AggregationInfoDto> {
@@ -104,14 +112,8 @@ export class AggregationService {
     }
   }
 
-  private async getActiveTask(tsdId: number): Promise<ActiveTaskEntity> {
-    const activeTask = await this.aggregationRepository.getActiveTask(tsdId);
-
-    if (!activeTask) {
-      throw new BadRequestException(`Для ТСД ${tsdId} не найдено активное задание`);
-    }
-
-    return activeTask;
+  private async getActiveTask(tsdId: number, manager?: EntityManager): Promise<ActiveTaskEntity> {
+    return this.aggregationRepository.getActiveTask(tsdId, manager);
   }
 
   private async getAndValidateActiveTask(
@@ -119,7 +121,6 @@ export class AggregationService {
     code: string,
   ): Promise<{ activeTask: ActiveTaskEntity; scanType: ExpectedScanType }> {
     const activeTask = await this.getActiveTask(tsdId);
-
     const scanType = this.validateScanType(
       code,
       activeTask,

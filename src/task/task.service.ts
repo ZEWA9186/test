@@ -1,6 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository } from 'typeorm';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, DeepPartial, Repository } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -9,6 +14,7 @@ import { ActiveTaskEntity } from '../aggregation/entities/active-task.entity';
 import { CodeValidationService } from '../validation/code-validation.service';
 import { NomenclaturesService } from '../nomenclatures/nomenclatures.service';
 import { TaskCodesEntity } from './entities/task-codes.entity';
+import { PackagingTableManager } from '../aggregation/repository/packaging-table-manager.service';
 
 @Injectable()
 export class TaskService {
@@ -21,10 +27,22 @@ export class TaskService {
     private readonly nomenclaturesService: NomenclaturesService,
     @InjectRepository(TaskCodesEntity)
     private readonly taskCodesRepository: Repository<TaskCodesEntity>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
+    private readonly packagingTableManager: PackagingTableManager,
   ) {}
 
+  /** Все обычные задания; исторические выдаются отдельным методом. */
   async getAllTask(): Promise<TaskEntity[]> {
-    return await this.taskRepository.find();
+    return await this.taskRepository.find({
+      where: { isHistory: false },
+    });
+  }
+
+  async getHistoryTasks(): Promise<TaskEntity[]> {
+    return await this.taskRepository.find({
+      where: { isHistory: true },
+    });
   }
 
   async getTaskById(id: number): Promise<TaskEntity | null> {
@@ -34,21 +52,20 @@ export class TaskService {
   }
 
   async getCodesByTaskId(taskId: number): Promise<string[]> {
-    return (
-      await this.taskCodesRepository.find({
-        where: { taskId },
-      })
-    ).map((code) => code.code);
+    const codes = await this.taskCodesRepository.find({
+      where: { taskId },
+    });
+
+    return codes.map((code) => code.code);
   }
 
   async createTask(data: any, nomenclatureId: number, numberValue?: number): Promise<TaskEntity> {
     const nomenclature = await this.nomenclaturesService.getNomenclatureById(nomenclatureId);
-    //TODO привязка n числа кодов, а не всего файла, допривязка кодов.
-    //TODO Фронт рассинхрон ловит, там другой способ привязки кодов
+
     if (!nomenclature) {
       throw new NotFoundException(`Номенклатура с ID ${nomenclatureId} не найдена`);
     }
-    //TODO Валидация и получение енв отдельно
+
     const codeDir = process.env.CODES_DIRECTORY;
 
     if (!codeDir) {
@@ -62,7 +79,6 @@ export class TaskService {
     }
 
     const codes = await this.readCodesFromFiles(filePaths, numberValue);
-
     const validationResult = await this.codeValidationService.cleanAndFilterCodes(
       codes,
       nomenclature.gtin,
@@ -83,13 +99,13 @@ export class TaskService {
     const taskDataForSave: DeepPartial<TaskEntity> = {
       ...nomenclature,
       ...taskData,
-      codes: validCodes.map((code) => ({
-        code,
-      })),
+      isActive: false,
+      isHistory: false,
+      packagingTableName: null,
+      codes: validCodes.map((code) => ({ code })),
     };
 
     const taskEntity = this.taskRepository.create(taskDataForSave);
-
     const savedTask = await this.taskRepository.save(taskEntity);
 
     await this.deleteTempFiles(filePaths);
@@ -117,44 +133,180 @@ export class TaskService {
     await this.taskRepository.update(id, { tsdIds });
   }
 
+  /** Обычные задания, которые сейчас выполняются на назначенном ТСД. */
   async getTaskInWorkForTsd(tsdId: number): Promise<TaskEntity[]> {
     const tasks = await this.getTasksForTsd(tsdId);
 
-    return tasks.filter((task) => task.isActive);
+    return tasks.filter((task) => task.isActive && !task.isHistory);
   }
 
+  /** Обычные задания, которые ещё не запускались или ожидают запуска. */
   async getTaskUnprocessedForTsd(tsdId: number): Promise<TaskEntity[]> {
     const tasks = await this.getTasksForTsd(tsdId);
 
-    return tasks.filter((task) => !task.isActive);
+    return tasks.filter((task) => !task.isActive && !task.isHistory);
   }
 
+  /** Исторические задания, назначенные этому ТСД. */
+  async getTaskHistoryForTsd(tsdId: number): Promise<TaskEntity[]> {
+    const tasks = await this.getTasksForTsd(tsdId);
+
+    return tasks.filter((task) => task.isHistory && !task.isActive);
+  }
+
+  /**
+   * Запускает обычное задание. Первым запуском создаётся таблица фасовки;
+   * следующие ТСД, подключённые к этому заданию, используют её же.
+   */
   async startTask(tsdId: number, taskId: number): Promise<void> {
-    const task = await this.getTaskById(taskId);
+    await this.dataSource.transaction(async (manager) => {
+      const taskRepository = manager.getRepository(TaskEntity);
+      const activeTaskRepository = manager.getRepository(ActiveTaskEntity);
 
-    if (!task) {
-      throw new NotFoundException(`Задача с ID ${taskId} не найдена`);
-    }
+      const task = await taskRepository.findOne({
+        where: { id: taskId },
+        lock: { mode: 'pessimistic_write' },
+      });
 
-    let activeTask = await this.activeTaskRepository.findOne({
-      where: { tsdId },
-    });
+      if (!task) {
+        throw new NotFoundException(`Задача с ID ${taskId} не найдена`);
+      }
 
-    if (!activeTask) {
-      activeTask = this.activeTaskRepository.create({
+      this.ensureTaskAssignedToTsd(task, tsdId);
+
+      if (task.isHistory) {
+        throw new ConflictException('Историческое задание нужно открывать через startHistoryTask');
+      }
+
+      const currentActiveTask = await activeTaskRepository.findOne({
+        where: { tsdId },
+      });
+
+      if (currentActiveTask) {
+        throw new ConflictException(`Для ТСД ${tsdId} уже существует активное задание`);
+      }
+
+      let tableName: string;
+
+      if (task.isActive) {
+        if (!task.packagingTableName) {
+          throw new ConflictException(`У активного задания ${task.id} не указана таблица фасовки`);
+        }
+
+        tableName = task.packagingTableName;
+      } else {
+        if (task.packagingTableName) {
+          throw new ConflictException(`У неактивного задания ${task.id} осталась таблица фасовки`);
+        }
+
+        tableName = await this.packagingTableManager.createTable(manager, task.gtin);
+
+        task.isActive = true;
+        task.isHistory = false;
+        task.packagingTableName = tableName;
+        await taskRepository.save(task);
+      }
+
+      const activeTask = activeTaskRepository.create({
         tsdId,
+        taskId: task.id,
         gtin: task.gtin,
         aggregationLvl: task.aggregationLvl,
         piecesPerSmallBox: task.piecesPerSmallBox,
         piecesPerBigBox: task.piecesPerBigBox,
         piecesPerPallet: task.piecesPerPallet,
+        packagingTableName: tableName,
       });
-    }
-    task.isActive = true;
 
-    activeTask.task = task;
-    await this.taskRepository.save(task);
-    await this.activeTaskRepository.save(activeTask);
+      await activeTaskRepository.save(activeTask);
+    });
+  }
+
+  /**
+   * Открывает существующую историческую фасовку на одном ТСД.
+   * Новая таблица не создаётся, TaskEntity.isActive не изменяется.
+   */
+  async startHistoryTask(tsdId: number, taskId: number): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const taskRepository = manager.getRepository(TaskEntity);
+      const activeTaskRepository = manager.getRepository(ActiveTaskEntity);
+
+      const task = await taskRepository.findOne({
+        where: { id: taskId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!task) {
+        throw new NotFoundException(`Задача с ID ${taskId} не найдена`);
+      }
+
+      this.ensureTaskAssignedToTsd(task, tsdId);
+
+      if (!task.isHistory || task.isActive) {
+        throw new ConflictException(
+          `Задание ${taskId} не является завершённым историческим заданием`,
+        );
+      }
+
+      // Одну историческую фасовку одновременно открывает только один ТСД.
+      const assignedTask = await activeTaskRepository.findOne({
+        where: { taskId },
+      });
+
+      if (assignedTask) {
+        throw new ConflictException(`Историческое задание ${taskId} уже открыто на другом ТСД`);
+      }
+
+      const activeTask = activeTaskRepository.create({
+        tsdId,
+        taskId: task.id,
+        gtin: task.gtin,
+        aggregationLvl: task.aggregationLvl,
+        piecesPerSmallBox: task.piecesPerSmallBox,
+        piecesPerBigBox: task.piecesPerBigBox,
+        piecesPerPallet: task.piecesPerPallet,
+        packagingTableName: task.packagingTableName,
+      });
+
+      await activeTaskRepository.save(activeTask);
+    });
+  }
+
+  /** Завершает обычное задание и переводит его в историю. */
+  async completeTask(tsdId: number): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const taskRepository = manager.getRepository(TaskEntity);
+      const activeTaskRepository = manager.getRepository(ActiveTaskEntity);
+
+      const activeTask = await activeTaskRepository.findOne({
+        where: { tsdId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!activeTask?.taskId) {
+        throw new NotFoundException(`Для ТСД ${tsdId} не найдено активное задание`);
+      }
+
+      const task = await taskRepository.findOne({
+        where: { id: activeTask.taskId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!task) {
+        throw new NotFoundException(`Задание ${activeTask.taskId} не найдено`);
+      }
+
+      if (task.isHistory || !task.isActive) {
+        throw new ConflictException(`Задание ${task.id} не находится в процессе выполнения`);
+      }
+
+      task.isActive = false;
+      task.isHistory = true;
+      await taskRepository.save(task);
+
+      // У задания может быть несколько ТСД: закрываем все их рабочие привязки.
+      await activeTaskRepository.delete({ taskId: task.id });
+    });
   }
 
   async getActiveTaskIdByTsdId(tsdId: number): Promise<number> {
@@ -176,12 +328,13 @@ export class TaskService {
   }
 
   async getProductsInBigBox(id: number): Promise<number> {
-    const task = await this.taskRepository.findOne({
-      where: { id },
-    });
+    const task = await this.taskRepository.findOne({ where: { id } });
+
     if (task && task.piecesPerSmallBox && task.piecesPerBigBox) {
       return task.piecesPerBigBox * task.piecesPerSmallBox;
-    } else throw new NotFoundException(`Неправильная конфигурация задания ${id}`);
+    }
+
+    throw new NotFoundException(`Неправильная конфигурация задания ${id}`);
   }
 
   async getProductsCount(id: number): Promise<number> {
@@ -189,12 +342,19 @@ export class TaskService {
   }
 
   async getProductsInPalletId(id: number): Promise<number> {
-    const task = await this.taskRepository.findOne({
-      where: { id },
-    });
-    if (task && task.piecesPerSmallBox && task.piecesPerBigBox) {
+    const task = await this.taskRepository.findOne({ where: { id } });
+
+    if (task && task.piecesPerSmallBox && task.piecesPerBigBox && task.piecesPerPallet) {
       return task.piecesPerBigBox * task.piecesPerSmallBox * task.piecesPerPallet;
-    } else throw new NotFoundException(`Неправильная конфигурация задания ${id}`);
+    }
+
+    throw new NotFoundException(`Неправильная конфигурация задания ${id}`);
+  }
+
+  private ensureTaskAssignedToTsd(task: TaskEntity, tsdId: number): void {
+    if (!task.tsdIds?.includes(tsdId)) {
+      throw new BadRequestException(`Задание ${task.id} не назначено на ТСД ${tsdId}`);
+    }
   }
 
   private async readCodesFromFiles(filePaths: string[], numberValue?: number): Promise<string[]> {
@@ -203,7 +363,6 @@ export class TaskService {
     for (const filePath of filePaths) {
       const absolutePath = path.resolve(filePath);
 
-      // ПРОВЕРКА НАЛИЧИЯ ФАЙЛА
       if (!fs.existsSync(absolutePath)) {
         throw new NotFoundException(`Файл не найден: ${absolutePath}`);
       }
@@ -231,7 +390,9 @@ export class TaskService {
     for (const filePath of filePaths) {
       try {
         await fs.promises.unlink(filePath);
-      } catch {}
+      } catch {
+        // Не прерываем создание задания, если временный файл уже удалён.
+      }
     }
   }
 
@@ -250,7 +411,6 @@ export class TaskService {
   private async getTasksForTsd(tsdId: number): Promise<TaskEntity[]> {
     return await this.taskRepository
       .createQueryBuilder('task')
-      .leftJoinAndSelect('task.activeTasks', 'activeTask')
       .where(':tsdId = ANY(task.tsdIds)', { tsdId })
       .getMany();
   }

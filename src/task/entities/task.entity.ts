@@ -1,7 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from 'typeorm';
 import { TaskCodesEntity } from './task-codes.entity';
-import { PackagingEntity } from '../../aggregation/entities/packaging.entity';
-import { ActiveTaskEntity } from '../../aggregation/entities/active-task.entity';
 
 @Entity('tasks')
 export class TaskEntity {
@@ -116,20 +114,22 @@ export class TaskEntity {
   @Column({ name: 'tsdIds', type: 'int', array: true, nullable: true })
   tsdIds: number[];
 
-  @OneToMany(() => ActiveTaskEntity, (activeTask) => activeTask.task, {
-    cascade: true,
-  })
-  activeTasks: ActiveTaskEntity[];
-
-  // Все упакованные коды по этой задаче со всех ТСД
-  @OneToMany(() => PackagingEntity, (packaging) => packaging.task)
-  packages: PackagingEntity[];
-
   @Column({ name: 'is_active', type: 'boolean', default: false })
   isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @Column({
+    name: 'packaging_table_name',
+    type: 'varchar',
+    length: 63,
+    nullable: true,
+  })
+  packagingTableName: string | null;
+
+  @Column({ name: 'is_history', type: 'boolean', default: false })
+  isHistory: boolean;
 
   @PrimaryGeneratedColumn('increment', { name: 'id' })
   id: number;

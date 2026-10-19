@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, InternalServerErrorException } from '@
 
 import { ActiveTaskEntity, ExpectedScanType } from '../aggregation/entities/active-task.entity';
 import { loggerGS1 } from '../logger-winston/winston.config';
-
+//Возможно стоит подумать
 @Injectable()
 export class Gs1ParserService {
   private readonly GS = '\x1D';
