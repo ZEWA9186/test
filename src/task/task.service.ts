@@ -31,7 +31,7 @@ export class TaskService {
     private readonly dataSource: DataSource,
     private readonly packagingTableManager: PackagingTableManager,
   ) {}
-
+  //TODO Назначение Тсд 1 раз
   /** Все обычные задания; исторические выдаются отдельным методом. */
   async getAllTask(): Promise<TaskEntity[]> {
     return await this.taskRepository.find({
@@ -72,7 +72,8 @@ export class TaskService {
       throw new Error('CODES_DIRECTORY environment variable not set');
     }
 
-    const filePaths = (data.files ?? []).map((fileName: string) => path.join(codeDir, fileName));
+    const { files, ...taskData } = data;
+    const filePaths: string = path.join(codeDir, files);
 
     if (filePaths.length === 0) {
       throw new BadRequestException('Не выбраны файлы с кодами');
@@ -93,8 +94,6 @@ export class TaskService {
     if (validCodes.length === 0) {
       throw new BadRequestException('Нет валидных кодов, задача не будет создана');
     }
-
-    const { files, ...taskData } = data;
 
     const taskDataForSave: DeepPartial<TaskEntity> = {
       ...nomenclature,
@@ -176,14 +175,6 @@ export class TaskService {
 
       if (task.isHistory) {
         throw new ConflictException('Историческое задание нужно открывать через startHistoryTask');
-      }
-
-      const currentActiveTask = await activeTaskRepository.findOne({
-        where: { tsdId },
-      });
-
-      if (currentActiveTask) {
-        throw new ConflictException(`Для ТСД ${tsdId} уже существует активное задание`);
       }
 
       let tableName: string;
@@ -357,42 +348,38 @@ export class TaskService {
     }
   }
 
-  private async readCodesFromFiles(filePaths: string[], numberValue?: number): Promise<string[]> {
+  private async readCodesFromFiles(filePath: string, numberValue?: number): Promise<string[]> {
     const allCodes: string[] = [];
 
-    for (const filePath of filePaths) {
-      const absolutePath = path.resolve(filePath);
+    const absolutePath = path.resolve(filePath);
 
-      if (!fs.existsSync(absolutePath)) {
-        throw new NotFoundException(`Файл не найден: ${absolutePath}`);
-      }
-
-      const content = await fs.promises.readFile(absolutePath, 'utf-8');
-
-      let codes = content
-        .split(/\r?\n/)
-        .map((line) => line.split('\t')[0])
-        .map((code) => code.trim())
-        .map((code) => this.parseQuotedValue(code))
-        .filter((code) => code);
-
-      if (numberValue) {
-        codes = codes.slice(0, numberValue);
-      }
-
-      allCodes.push(...codes);
+    if (!fs.existsSync(absolutePath)) {
+      throw new NotFoundException(`Файл не найден: ${absolutePath}`);
     }
+
+    const content = await fs.promises.readFile(absolutePath, 'utf-8');
+
+    let codes = content
+      .split(/\r?\n/)
+      .map((line) => line.split('\t')[0])
+      .map((code) => code.trim())
+      .map((code) => this.parseQuotedValue(code))
+      .filter((code) => code);
+
+    if (numberValue) {
+      codes = codes.slice(0, numberValue);
+    }
+
+    allCodes.push(...codes);
 
     return allCodes;
   }
 
-  private async deleteTempFiles(filePaths: string[]): Promise<void> {
-    for (const filePath of filePaths) {
-      try {
-        await fs.promises.unlink(filePath);
-      } catch {
-        // Не прерываем создание задания, если временный файл уже удалён.
-      }
+  private async deleteTempFiles(filePath: string): Promise<void> {
+    try {
+      await fs.promises.unlink(filePath);
+    } catch {
+      // Не прерываем создание задания, если временный файл уже удалён.
     }
   }
 

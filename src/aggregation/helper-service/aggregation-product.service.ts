@@ -11,7 +11,7 @@ export class AggregationProductService {
 
   async addProduct(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
     await this.aggregationRepository.addProduct(activeTask, code, manager);
-
+    //TODO можно оптимизировать в 1 запрос
     const count = await this.aggregationRepository.getOpenProductCount(activeTask, manager);
 
     const limit = AggregationRules.getProductLimit(activeTask);

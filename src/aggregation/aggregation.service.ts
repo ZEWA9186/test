@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
 import { ActiveTaskEntity, ExpectedScanType } from './entities/active-task.entity';
-import { AggregationRepository } from './repository/aggregation.repository';
+import { AggregationRepository, ContainerFillStats } from './repository/aggregation.repository';
 import { AggregationProductService } from './helper-service/aggregation-product.service';
 import { AggregationContainerService } from './helper-service/aggregation-container.service';
 import { AggregationRules } from './helper-service/aggregation.rules';
@@ -11,7 +11,6 @@ import { AggregationInfoDto } from './dto/responce.dto';
 import { CodeService } from '../code/code.service';
 import { Gs1ParserService } from '../gs1-parser/gs1-parser.service';
 
-// TODO: логирование ручных операций и ошибок.
 @Injectable()
 export class AggregationService {
   constructor(
@@ -23,9 +22,9 @@ export class AggregationService {
     private readonly gs1Parser: Gs1ParserService,
   ) {}
 
-  // Обычный поток сканирования работает только с текущей фасовкой.
   async processScan(tsdId: number, code: string) {
-    const { activeTask, scanType } = await this.getAndValidateActiveTask(tsdId, code);
+    const activeTask = await this.getActiveTask(tsdId);
+    const scanType = this.gs1Parser.getScanType(code, activeTask);
 
     if (scanType !== ExpectedScanType.PRODUCT) {
       return this.withTransaction((manager) =>
@@ -112,23 +111,41 @@ export class AggregationService {
     }
   }
 
-  private async getActiveTask(tsdId: number, manager?: EntityManager): Promise<ActiveTaskEntity> {
-    return this.aggregationRepository.getActiveTask(tsdId, manager);
+  async validateTaskCompletion(tsdId: number) {
+    const activeTask = await this.getActiveTask(tsdId);
+
+    const stats = await this.aggregationRepository.getTaskPackagingStats(activeTask);
+
+    const formatCode = (code: string): string => {
+      const scanType = this.gs1Parser.getScanType(code, activeTask);
+
+      return scanType === ExpectedScanType.PRODUCT ? code : this.gs1Parser.getContainerNumber(code);
+    };
+
+    const formatContainers = (containers: ContainerFillStats[]) =>
+      containers.map((container) => ({
+        ...container,
+        label: formatCode(container.label),
+        productCodes: container.productCodes.map(formatCode),
+      }));
+
+    return {
+      ...stats,
+      productsWithoutPackaging: stats.productsWithoutPackaging.map(formatCode),
+      smallBoxesWithoutBigBox: stats.smallBoxesWithoutBigBox.map(formatCode),
+      bigBoxesWithoutPallet: stats.bigBoxesWithoutPallet.map(formatCode),
+      smallBoxes: formatContainers(stats.smallBoxes),
+      bigBoxes: formatContainers(stats.bigBoxes),
+      pallets: formatContainers(stats.pallets),
+    };
   }
 
-  private async getAndValidateActiveTask(
-    tsdId: number,
-    code: string,
-  ): Promise<{ activeTask: ActiveTaskEntity; scanType: ExpectedScanType }> {
-    const activeTask = await this.getActiveTask(tsdId);
-    const scanType = this.validateScanType(
-      code,
-      activeTask,
-      activeTask.expectedScan,
-      `Ожидался ${activeTask.expectedScan}`,
-    );
-
-    return { activeTask, scanType };
+  private async getActiveTask(tsdId: number, manager?: EntityManager) {
+    const activeTask = await this.aggregationRepository.getActiveTask(tsdId, manager);
+    if (!activeTask) {
+      throw new BadRequestException('Активное задание не назначено');
+    }
+    return activeTask;
   }
 
   private validateScanType(

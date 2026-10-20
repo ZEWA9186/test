@@ -3,15 +3,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { logger1S } from '../logger-winston/winston.config';
-import { getJsonDirectory1S, initDirectories } from '../path.utils';
+import { getJsonDirectory1S } from '../path.utils';
 import * as dotenv from 'dotenv';
 import { TaskCheckResult } from './dto/task-check-result';
 import { Repository } from 'typeorm';
 import { TaskEntity } from '../task/entities/task.entity';
 import { JsonValidationService } from '../validation/json-validate.service';
-import { TaskCodesEntity } from '../task/entities/task-codes.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { map1sJsonToTaskEntity } from './task-mapper.helper';
 
 dotenv.config();
 const interval = Number(process.env.CHECK_1S_INTERVAL) || 60000;
@@ -38,8 +36,6 @@ export class Task1sService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // await initDirectories();
-
     await this.checkFilesInDirectory();
     logger1S.debug('Запуск проверки файлов от 1С...');
 
@@ -149,7 +145,8 @@ export class Task1sService implements OnModuleInit {
 
       try {
         const rawCodes: string[] = codes && codes.length > 0 ? codes : jsonParsed.codes;
-        const mappedData = map1sJsonToTaskEntity(jsonParsed, rawCodes);
+
+        const mappedData = { ...jsonParsed, codes: rawCodes.map((codeStr) => ({ code: codeStr })) };
         const taskEntity = this.taskRepository.create(mappedData);
 
         await this.taskRepository.save(taskEntity);
@@ -176,17 +173,5 @@ export class Task1sService implements OnModuleInit {
       ],
       items: !result.success ? result.items : undefined,
     };
-  }
-
-  private generateFilename(jsonData: any): string {
-    const gtin = jsonData.gtin || '';
-    const itf14 = jsonData.ITF14 ? `_${jsonData.ITF14}` : '';
-    const batch = jsonData.batch || '';
-
-    const cleanGtin = gtin.replace(/[^a-zA-Z0-9_-]/g, '');
-    const cleanItf14 = itf14.replace(/[^a-zA-Z0-9_-]/g, '');
-    const cleanBatch = batch.replace(/[^a-zA-Z0-9_-]/g, '');
-
-    return `${cleanGtin}${cleanItf14}_${cleanBatch}.json`;
   }
 }

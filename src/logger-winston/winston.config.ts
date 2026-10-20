@@ -65,6 +65,7 @@ export const printerLogger = createLogger('printer');
 export const loggerGS1 = createLogger('loggerGS1');
 export const templateLogger = createLogger('template');
 export const usersLogger = createLogger('users');
+export const AggregationLogger = createLogger('aggregation');
 export const reportLogger = createLogger('reports');
 
 export const getLastLogMessages = () => logMessages.slice(0, 1);
