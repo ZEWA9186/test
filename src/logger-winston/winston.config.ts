@@ -58,15 +58,13 @@ const createLogger = (filename: string) => {
 };
 
 export const codeLogger = createLogger('code');
-export const trialLogger = createLogger('trial');
 export const logger1S = createLogger('logger1S');
 export const backupLogger = createLogger('backup');
 export const printerLogger = createLogger('printer');
 export const loggerGS1 = createLogger('loggerGS1');
-export const templateLogger = createLogger('template');
 export const usersLogger = createLogger('users');
-export const AggregationLogger = createLogger('aggregation');
-export const reportLogger = createLogger('reports');
+export const aggregationLogger = createLogger('aggregation');
+export const configLogger = createLogger('config');
 
 export const getLastLogMessages = () => logMessages.slice(0, 1);
 export const getLogMessages = () => logMessages;

@@ -1,4 +1,5 @@
 import { GenerateOptions, LABEL_FORMATS, PrintersTypes } from './types';
+import { getGLN, getPrinterType } from '../config/config.env';
 
 export const getBoxNetto = (productNetto: number, count: number) => {
   return productNetto * count;
@@ -368,7 +369,7 @@ export const generateDatabaseCipher = (
   nettoWeight?: number,
   bruttoWeight?: number,
 ): string => {
-  const isZPL = process.env.PRINTER_TYPE === PrintersTypes.ZPL;
+  const isZPL = getPrinterType() === PrintersTypes.ZPL;
   const blocks = template.filter((item) => item?.trim());
 
   const formatOptions: Record<string, string> = {};
@@ -411,7 +412,7 @@ const calculateControlSum = (tempLabel: string) => {
 
 export const generateLabel = (labelType: string, packageNumber: string): string => {
   const formatPackageNumber = packageNumber.padStart(7, '0');
-  const tempLabel = `00${labelType}${process.env.GLN}${formatPackageNumber}`;
+  const tempLabel = `00${labelType}${getGLN()}${formatPackageNumber}`;
   calculateControlSum(tempLabel);
 
   return calculateControlSum(tempLabel);

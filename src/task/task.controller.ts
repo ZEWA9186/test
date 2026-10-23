@@ -31,13 +31,13 @@ export class TaskController {
     return await this.taskService.getTaskHistoryForTsd(tsdId);
   }
 
-  @Post('history/:id/start')
+  @Post('tsd/:tsdId/history/:id/start')
   @HttpCode(HttpStatus.OK)
   async startHistoryTask(
+    @Param('tsdId', ParseIntPipe) tsdId: number,
     @Param('id', ParseIntPipe) taskId: number,
-    @Body('tsdId', ParseIntPipe) tsdId: number,
   ) {
-    return await this.taskService.startHistoryTask(tsdId, taskId);
+    return this.taskService.startHistoryTask(tsdId, taskId);
   }
 
   @Get('tsd/:tsdId/in-work')
@@ -87,5 +87,11 @@ export class TaskController {
   @HttpCode(HttpStatus.OK)
   async activeTask(@Param('tsdId', ParseIntPipe) tsdId: number) {
     return await this.taskService.getActiveTaskIdByTsdId(tsdId);
+  }
+
+  @Post(':tsdId/complete')
+  @HttpCode(HttpStatus.OK)
+  async completeTask(@Param('tsdId', ParseIntPipe) tsdId: number) {
+    await this.taskService.completeTask(tsdId);
   }
 }

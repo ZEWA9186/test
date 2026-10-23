@@ -3,34 +3,30 @@ import { Logger } from 'winston';
 // import { Status } from 'src/globalTypes';
 import * as fs from 'fs';
 import * as iconv from 'iconv-lite';
-import { getTemplateDirectory } from '../path.utils';
+import { getTemplateDirectory } from '../config/config.paths';
 import { exec } from 'child_process';
 import { getBoxNetto, getBoxNettoKG, getNettoUnitKG, generateLabel } from './helper';
 import { promisify } from 'util';
 import * as dotenv from 'dotenv';
-import { EncodingType, LABEL_FORMATS, PrintersTypes } from './types';
+import { EncodingType } from './types';
+import { getPcName, getPrinterDecodeType, getPrinterEncodeType } from '../config/config.env';
 dotenv.config();
-const AVTO = process.env.AVTO === 'true';
 const execAsync = promisify(exec);
 
 // let globalPrinterStatus = Status.Connected;
-const printer1DecodeType = process.env.PRINTER1_DECODE_TYPE || '';
-const printer1EncodeType = process.env.PRINTER1_ENCODE_TYPE || '';
-const printer2DecodeType = process.env.PRINTER2_DECODE_TYPE || '';
-const printer2EncodeType = process.env.PRINTER2_ENCODE_TYPE || '';
+const printer1DecodeType = getPrinterDecodeType();
+const printer1EncodeType = getPrinterEncodeType();
 
 export async function printLabelBox(
   boxNumber: number,
   countInBox: number,
   printer: any,
-  boxTemplate: any[],
   task: any,
   logger: Logger,
   printerName: any,
 ) {
-  const PCName = process.env.PC_NAME || '';
+  const PCName = getPcName();
   console.log('===============printerName', printerName);
-
   if (!printer) {
     logger.warn('Принтер: Принтер не подключен');
     return;
@@ -97,12 +93,11 @@ export async function printLabelSmallBox(
   boxNumber: number,
   countInBox: number,
   printer: any,
-  boxTemplate: any[],
   task: any,
   logger: Logger,
   printerName: any,
 ) {
-  const PCName = process.env.PC_NAME || '';
+  const PCName = getPcName();
   console.log('===============printerName', printerName);
 
   if (!printer) {
@@ -171,13 +166,12 @@ export async function printLabelPallet(
   palletNumber: number,
   countInPallet: number,
   printer: any,
-  palletTemplate: any[],
   task: any,
   logger: Logger,
   itemsPerPallet: any,
   printerName: any,
 ) {
-  const PCName = process.env.PC_NAME || '';
+  const PCName = getPcName();
   if (!printer) {
     logger.warn('Принтер: Принтер не подключен');
     return;
@@ -190,10 +184,8 @@ export async function printLabelPallet(
   try {
     logger.warn(`Печать этикетки для паллеты ${palletNumber}`);
     printer.clear();
-    const encoding =
-      printer2EncodeType === PrintersTypes.ZPL ? EncodingType.UTF8 : EncodingType.WIN1251;
-    const decoding =
-      printer2DecodeType === PrintersTypes.ZPL ? EncodingType.UTF8 : EncodingType.WIN1251;
+    const encoding = EncodingType.WIN1251;
+    const decoding = EncodingType.WIN1251;
     console.log('--------encoding,decoding ----pallet', encoding, decoding, printerName);
 
     fs.readFile(`${getTemplateDirectory()}/${task.palletLabel}.prn`, (err, data) => {

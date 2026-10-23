@@ -2,7 +2,6 @@ import { Controller, Get, Post, Param, Body, ParseIntPipe } from '@nestjs/common
 
 import { NomenclaturesService } from './nomenclatures.service';
 import { NomenclatureEntity } from './entities/nomenclature.entity';
-import { CreateNomenclatureDto } from './dto/create-nomenclature.dto';
 
 @Controller('nomenclatures')
 export class NomenclaturesController {
@@ -21,7 +20,7 @@ export class NomenclaturesController {
   }
 
   @Post()
-  async createNomenclature(@Body() data: CreateNomenclatureDto): Promise<NomenclatureEntity> {
+  async createNomenclature(@Body() data: any): Promise<NomenclatureEntity> {
     return await this.nomenclaturesService.createNomenclature(data);
   }
 

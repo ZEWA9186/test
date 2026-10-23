@@ -71,6 +71,12 @@ export class AggregationController {
     return await this.aggregationService.validateTaskCompletion(tsdId);
   }
 
+  @Get(':id/get-current-state')
+  @HttpCode(HttpStatus.OK)
+  async getCurrentState(@Param('id', ParseIntPipe) tsdId: number) {
+    return await this.aggregationService.getCurrentState(tsdId);
+  }
+
   @Get()
   @HttpCode(HttpStatus.OK)
   async ping() {}

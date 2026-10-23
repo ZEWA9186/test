@@ -16,10 +16,12 @@ export class UserController {
   }
 
   @Post('auth')
-  async auth(@Body() authUserDto: { username: string; password: string }): Promise<Partial<User>> {
-    const { username, password } = authUserDto;
+  async auth(
+    @Body() authUserDto: { username: string; password: string; key: string },
+  ): Promise<Partial<User>> {
+    const { username, password, key } = authUserDto;
     console.log(username, password);
-    return this.userService.authUser(username, password);
+    return this.userService.authUser(username, password, key);
   }
 
   @Get()

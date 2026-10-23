@@ -7,7 +7,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { backupLogger } from '../logger-winston/winston.config';
-import { getBackupDirectories, getPostgresPath } from '../path.utils';
+import { getBackupDirectories, getPostgresPath } from '../config/config.paths';
+import { getBackupInterval } from '../config/config.env';
 
 const execPromise = promisify(exec);
 
@@ -18,7 +19,7 @@ export class BackupService {
     private readonly dataSource: DataSource,
   ) {}
 
-  @Cron(process.env.BACKUP_INTERVAL || '0 0 1,16 * *')
+  @Cron(getBackupInterval())
   async createDatabaseBackup() {
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
     const backupFileName = `db_backup_${dateStr}.dump`;
@@ -62,10 +63,7 @@ export class BackupService {
     } catch (error: any) {
       console.log('STDERR:', error.stderr);
       console.log('MESSAGE:', error.message);
-      backupLogger.error(
-        `Ошибка создания бэкапа: ${error.message}`,
-        error.stack,
-      );
+      backupLogger.error(`Ошибка создания бэкапа: ${error.message}`, error.stack);
     }
   }
 }

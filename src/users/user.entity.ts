@@ -16,4 +16,7 @@ export class User {
 
   @Column({ name: 'is_active', nullable: true })
   isActive: boolean;
+
+  @Column({ type: 'bigint', nullable: true })
+  key: string | null;
 }

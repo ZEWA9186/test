@@ -3,13 +3,13 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { Logger } from 'winston';
 import { printerLogger } from '../../logger-winston/winston.config';
-import { getTemplateDirectory } from '../../path.utils';
+import { getTemplateDirectory } from '../../config/config.paths';
 import { PrinterQueueService } from './printer-queue.service';
 
 @Injectable()
 export class PrinterDMService {
   constructor(
-    private readonly printerQueue: PrinterQueueService ,
+    private readonly printerQueue: PrinterQueueService,
     @Inject('winston') private readonly logger: Logger = printerLogger,
   ) {}
 

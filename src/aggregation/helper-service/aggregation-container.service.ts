@@ -3,10 +3,14 @@ import { EntityManager } from 'typeorm';
 
 import { ActiveTaskEntity, ExpectedScanType } from '../entities/active-task.entity';
 import { AggregationRepository } from '../repository/aggregation.repository';
+import { AggregationProgressService } from './aggregation-progress.service';
 
 @Injectable()
 export class AggregationContainerService {
-  constructor(private readonly aggregationRepository: AggregationRepository) {}
+  constructor(
+    private readonly aggregationRepository: AggregationRepository,
+    private readonly aggregationProgressService: AggregationProgressService,
+  ) {}
 
   async closeContainer(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
     switch (activeTask.expectedScan) {
@@ -46,7 +50,7 @@ export class AggregationContainerService {
 
     await this.aggregationRepository.saveActiveTask(activeTask, manager);
 
-    return activeTask.expectedScan;
+    return await this.aggregationProgressService.getProgress(activeTask);
   }
 
   private async closeBigBox(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
@@ -66,7 +70,7 @@ export class AggregationContainerService {
 
     await this.aggregationRepository.saveActiveTask(activeTask, manager);
 
-    return activeTask.expectedScan;
+    return this.aggregationProgressService.getProgress(activeTask);
   }
 
   private async closePallet(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
@@ -81,6 +85,6 @@ export class AggregationContainerService {
 
     await this.aggregationRepository.saveActiveTask(activeTask, manager);
 
-    return activeTask.expectedScan;
+    return await this.aggregationProgressService.getProgress(activeTask);
   }
 }

@@ -3,16 +3,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { logger1S } from '../logger-winston/winston.config';
-import { getJsonDirectory1S } from '../path.utils';
+import { getJsonDirectory1S } from '../config/config.paths';
 import * as dotenv from 'dotenv';
 import { TaskCheckResult } from './dto/task-check-result';
 import { Repository } from 'typeorm';
 import { TaskEntity } from '../task/entities/task.entity';
 import { JsonValidationService } from '../validation/json-validate.service';
 import { InjectRepository } from '@nestjs/typeorm';
+import { getCheck1SInterval } from '../config/config.env';
 
 dotenv.config();
-const interval = Number(process.env.CHECK_1S_INTERVAL) || 60000;
+const interval = Number(getCheck1SInterval()) || 60000;
 
 @Injectable()
 export class Task1sService implements OnModuleInit {

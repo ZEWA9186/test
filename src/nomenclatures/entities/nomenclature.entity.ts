@@ -11,8 +11,14 @@ export class NomenclatureEntity {
   @Column({ name: 'name', type: 'varchar', nullable: true })
   name: string;
 
-  @Column({ name: 'gost', type: 'varchar', nullable: true })
-  gost: string;
+  @Column({ name: 'description', type: 'varchar', nullable: true })
+  description: string;
+
+  @Column({ name: 'itf_14', type: 'varchar', length: 14, nullable: true })
+  ITF14: string;
+
+  @Column({ name: 'EAN13', type: 'varchar', length: 14, nullable: true })
+  EAN13: string;
 
   @Column({ name: 'small_box_lable', type: 'varchar', nullable: true })
   smallBoxLabel: string;
@@ -23,11 +29,17 @@ export class NomenclatureEntity {
   @Column({ name: 'pallet_label', type: 'varchar', nullable: true })
   palletLabel: string;
 
+  @Column({ name: 'gost', type: 'varchar', nullable: true })
+  gost: string;
+
   @Column({ name: 'netto_unit', type: 'varchar', nullable: true })
   nettoUnit: string;
 
   @Column({ name: 'brutto_unit', type: 'varchar', nullable: true })
   bruttoUnit: string;
+
+  @Column({ name: 'brutto_box', type: 'varchar', nullable: true })
+  bruttoBox: string;
 
   @Column({ name: 'ad_info_1', type: 'varchar', nullable: true })
   adInfo1: string;

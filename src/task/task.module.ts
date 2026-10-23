@@ -11,6 +11,8 @@ import { TaskCodesEntity } from './entities/task-codes.entity';
 import { ValidationModule } from '../validation/validation.module';
 import { NomenclaturesModule } from '../nomenclatures/nomenclatures.module';
 import { AggregationModule } from '../aggregation/aggregation.module';
+import { ReportService } from './reports/report.service';
+import { ReportRepository } from './reports/report.repository';
 
 @Module({
   imports: [
@@ -20,7 +22,7 @@ import { AggregationModule } from '../aggregation/aggregation.module';
     AggregationModule,
   ],
   controllers: [TaskController],
-  providers: [TaskService],
+  providers: [TaskService, ReportService, ReportRepository],
   exports: [TaskService],
 })
 export class TaskModule {}

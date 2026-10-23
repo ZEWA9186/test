@@ -1,9 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 
 import { NomenclatureEntity } from './entities/nomenclature.entity';
-import { CreateNomenclatureDto } from './dto/create-nomenclature.dto';
 
 @Injectable()
 export class NomenclaturesService {
@@ -22,7 +21,7 @@ export class NomenclaturesService {
     });
   }
 
-  async createNomenclature(data: CreateNomenclatureDto): Promise<NomenclatureEntity> {
+  async createNomenclature(data: DeepPartial<NomenclatureEntity>): Promise<NomenclatureEntity> {
     const nomenclature = this.nomenclatureRepository.create(data);
 
     return await this.nomenclatureRepository.save(nomenclature);

@@ -4,27 +4,36 @@ import { EntityManager } from 'typeorm';
 import { ActiveTaskEntity, ExpectedScanType } from '../entities/active-task.entity';
 import { AggregationRepository } from '../repository/aggregation.repository';
 import { AggregationRules } from './aggregation.rules';
+import { AggregationProgressService } from './aggregation-progress.service';
+import { AggregationResponseDto } from '../dto/responce.dto';
 
 @Injectable()
 export class AggregationProductService {
-  constructor(private readonly aggregationRepository: AggregationRepository) {}
+  constructor(
+    private readonly aggregationRepository: AggregationRepository,
+    private readonly aggregationProgressService: AggregationProgressService,
+  ) {}
 
-  async addProduct(activeTask: ActiveTaskEntity, code: string, manager: EntityManager) {
-    await this.aggregationRepository.addProduct(activeTask, code, manager);
-    //TODO можно оптимизировать в 1 запрос
-    const count = await this.aggregationRepository.getOpenProductCount(activeTask, manager);
+  async addProduct(
+    activeTask: ActiveTaskEntity,
+    code: string,
+    manager: EntityManager,
+  ): Promise<AggregationResponseDto> {
+    let count = await this.aggregationRepository.getOpenProductCount(activeTask, manager);
 
     const limit = AggregationRules.getProductLimit(activeTask);
 
     if (count < limit) {
-      return activeTask.expectedScan;
+      await this.aggregationRepository.addProduct(activeTask, code, manager);
     }
+    if (++count == limit) {
+      activeTask.expectedScan = AggregationRules.getNextContainerType(activeTask);
 
-    activeTask.expectedScan = AggregationRules.getNextContainerType(activeTask);
+      await this.aggregationRepository.saveActiveTask(activeTask, manager);
 
-    await this.aggregationRepository.saveActiveTask(activeTask, manager);
-
-    return activeTask.expectedScan;
+      return await this.aggregationProgressService.getProgress(activeTask);
+    }
+    return await this.aggregationProgressService.getProgress(activeTask);
   }
 
   async addProductIntoPackage(

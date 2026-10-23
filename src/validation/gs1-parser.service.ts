@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, InternalServerErrorException } from '@
 
 import { ActiveTaskEntity, ExpectedScanType } from '../aggregation/entities/active-task.entity';
 import { loggerGS1 } from '../logger-winston/winston.config';
+import { getGLN } from '../config/config.env';
 //Возможно стоит подумать
 @Injectable()
 export class Gs1ParserService {
@@ -93,7 +94,7 @@ export class Gs1ParserService {
   }
 
   private validateGln(labelGln: string) {
-    const expectedGln = process.env.GLN?.trim();
+    const expectedGln = getGLN();
 
     //TODO Отдельный модуль валидации енв
 

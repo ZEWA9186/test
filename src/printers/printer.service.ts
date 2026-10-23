@@ -4,7 +4,6 @@ import { Logger } from 'winston';
 
 import { printLabelBox, printLabelPallet, printLabelSmallBox } from './printer.utils';
 
-import { TemplateService } from '../template/template.service';
 import { printerLogger } from '../logger-winston/winston.config';
 
 import { PrinterLabels } from './types';
@@ -16,13 +15,13 @@ import { PrinterConnectionService } from './printers-helper/printer-connection.s
 import { TaskService } from '../task/task.service';
 import { PrinterDMService } from './printers-helper/printerDM.service';
 import { LastPackageService } from '../last-package/last-package.service';
+import { getPrinterName } from '../config/config.env';
 
 @Injectable()
 export class PrinterService implements OnModuleInit {
   constructor(
     private readonly printerConfigService: PrinterConfigService,
     private readonly printerConnectionService: PrinterConnectionService,
-    private readonly templateService: TemplateService,
 
     private readonly taskService: TaskService,
     private readonly lastPackageService: LastPackageService,
@@ -160,22 +159,13 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов в малой коробке');
     }
 
-    const template = this.templateService.getAll();
-
-    const boxTemplate = template?.find((el: any) => el.type === 'smallBox')?.template || [];
-
-    if (!boxTemplate.length) {
-      return;
-    }
-
-    const printerName = process.env.PRINTER_NAME_1 || '';
+    const printerName = getPrinterName();
 
     try {
       await printLabelSmallBox(
         boxNumber,
         task.piecesPerSmallBox,
         printer,
-        boxTemplate,
         task,
         this.logger,
         printerName,
@@ -203,28 +193,12 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов в большой коробке');
     }
 
-    const template = this.templateService.getAll();
-
-    const boxTemplate = template?.find((el: any) => el.type === 'bigBox')?.template || [];
-
-    if (!boxTemplate.length) {
-      return;
-    }
-
     const ProductsInBigBox = await this.taskService.getProductsInBigBox(taskId);
     //TODO Исправить генератор, добавить количество продуктов в коробке
-    const printerName = process.env.PRINTER_NAME_1 || '';
+    const printerName = getPrinterName();
 
     try {
-      await printLabelBox(
-        boxNumber,
-        task.piecesPerBigBox,
-        printer,
-        boxTemplate,
-        task,
-        this.logger,
-        printerName,
-      );
+      await printLabelBox(boxNumber, task.piecesPerBigBox, printer, task, this.logger, printerName);
     } catch (err) {
       this.logger.error('Ошибка печати этикетки большой коробки:', err);
     }
@@ -249,23 +223,14 @@ export class PrinterService implements OnModuleInit {
         throw new BadRequestException('В задаче не указано количество продуктов на паллете');
       }
 
-      const template = this.templateService.getAll();
-
-      const palletTemplate = template?.find((el: any) => el.type === 'pallet')?.template || [];
-
-      if (!palletTemplate.length) {
-        return;
-      }
-
       const productsInPallet = await this.taskService.getProductsInPalletId(taskId);
 
-      const printerName = process.env.PRINTER_NAME_1 || '';
+      const printerName = getPrinterName();
 
       await printLabelPallet(
         palletNumber,
         task.piecesPerPallet,
         printer,
-        palletTemplate,
         task,
         this.logger,
         productsInPallet,

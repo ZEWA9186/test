@@ -2,10 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger1S } from '../logger-winston/winston.config';
 import { CodeValidationService } from './code-validation.service';
-import { getJsonDirectory1STemplate, getTemplateDirectory } from '../path.utils';
+import { getJsonDirectory1STemplate, getTemplateDirectory } from '../config/config.paths';
 import { TASK } from '../files1s/sample';
 import { Injectable } from '@nestjs/common';
 import { TaskValidationResult } from '../files1s/dto/task-validation-dto';
+import { isCodeFilterEnabled } from '../config/config.env';
 
 @Injectable()
 export class JsonValidationService {
@@ -126,9 +127,7 @@ export class JsonValidationService {
           break;
         case 'codes': {
           try {
-            const shouldFilter = process.env.CODE_FILTER_ENABLED === 'true';
-
-            const codeValidation = shouldFilter
+            const codeValidation = isCodeFilterEnabled()
               ? await this.codeValidationService.cleanAndFilterCodes(value, jsonData.gtin)
               : await this.codeValidationService.validate(value, jsonData.gtin);
 

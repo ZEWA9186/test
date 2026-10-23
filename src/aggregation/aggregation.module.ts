@@ -8,11 +8,12 @@ import { AggregationRules } from './helper-service/aggregation.rules';
 import { AggregationRepository } from './repository/aggregation.repository';
 import { AggregationProductService } from './helper-service/aggregation-product.service';
 import { AggregationContainerService } from './helper-service/aggregation-container.service';
-import { Gs1ParserModule } from '../gs1-parser/gs1-parser.module';
 import { PackagingTableManager } from './repository/packaging-table-manager.service';
+import { ValidationModule } from '../validation/validation.module';
+import { AggregationProgressService } from './helper-service/aggregation-progress.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ActiveTaskEntity]), CodeModule, Gs1ParserModule],
+  imports: [TypeOrmModule.forFeature([ActiveTaskEntity]), CodeModule, ValidationModule],
   controllers: [AggregationController],
   providers: [
     AggregationService,
@@ -21,6 +22,7 @@ import { PackagingTableManager } from './repository/packaging-table-manager.serv
     AggregationProductService,
     AggregationContainerService,
     PackagingTableManager,
+    AggregationProgressService,
   ],
   exports: [AggregationService, PackagingTableManager],
 })

@@ -49,7 +49,7 @@ export class UserService {
     return this.toPublicUser(savedUser);
   }
 
-  async authUser(username: string, password: string): Promise<Partial<User>> {
+  async authUser(username: string, password: string, key: string): Promise<Partial<User>> {
     if (!username || !password) {
       throw new BadRequestException('Имя и пароль обязательны');
     }
@@ -67,9 +67,12 @@ export class UserService {
     if (!isPasswordMatching) {
       throw new ConflictException('Неверный пароль');
     }
-    if (user.isActive) {
-      throw new BadRequestException(`Пользователь ${user.username} уже активен`);
+    if (key !== user.key) {
+      if (user.isActive) {
+        throw new BadRequestException(`Пользователь ${user.username} уже активен`);
+      }
     }
+    user.key = Date.now().toString();
     user.isActive = true;
     await this.userRepository.save(user);
 

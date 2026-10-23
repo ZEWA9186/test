@@ -15,6 +15,8 @@ import { CodeValidationService } from '../validation/code-validation.service';
 import { NomenclaturesService } from '../nomenclatures/nomenclatures.service';
 import { TaskCodesEntity } from './entities/task-codes.entity';
 import { PackagingTableManager } from '../aggregation/repository/packaging-table-manager.service';
+import { ReportService } from './reports/report.service';
+import { getCodesDirectory } from '../config/config.paths';
 
 @Injectable()
 export class TaskService {
@@ -30,9 +32,8 @@ export class TaskService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly packagingTableManager: PackagingTableManager,
+    private readonly reportService: ReportService,
   ) {}
-  //TODO Назначение Тсд 1 раз
-  /** Все обычные задания; исторические выдаются отдельным методом. */
   async getAllTask(): Promise<TaskEntity[]> {
     return await this.taskRepository.find({
       where: { isHistory: false },
@@ -66,11 +67,7 @@ export class TaskService {
       throw new NotFoundException(`Номенклатура с ID ${nomenclatureId} не найдена`);
     }
 
-    const codeDir = process.env.CODES_DIRECTORY;
-
-    if (!codeDir) {
-      throw new Error('CODES_DIRECTORY environment variable not set');
-    }
+    const codeDir = getCodesDirectory();
 
     const { files, ...taskData } = data;
     const filePaths: string = path.join(codeDir, files);
@@ -263,7 +260,7 @@ export class TaskService {
     });
   }
 
-  /** Завершает обычное задание и переводит его в историю. */
+  /** Завершает обычное задание, сохраняет отчёт и переводит задание в историю. */
   async completeTask(tsdId: number): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const taskRepository = manager.getRepository(TaskEntity);
@@ -287,15 +284,12 @@ export class TaskService {
         throw new NotFoundException(`Задание ${activeTask.taskId} не найдено`);
       }
 
-      if (task.isHistory || !task.isActive) {
-        throw new ConflictException(`Задание ${task.id} не находится в процессе выполнения`);
-      }
+      await this.reportService.buildAndSaveReport(task);
 
       task.isActive = false;
       task.isHistory = true;
       await taskRepository.save(task);
 
-      // У задания может быть несколько ТСД: закрываем все их рабочие привязки.
       await activeTaskRepository.delete({ taskId: task.id });
     });
   }

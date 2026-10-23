@@ -112,6 +112,7 @@ export class PrinterMonitoringService implements OnModuleInit, OnModuleDestroy {
     return new Promise((resolve) => {
       const client = new net.Socket();
 
+      // eslint-disable-next-line prefer-const
       let timeout: NodeJS.Timeout;
 
       client.connect(endpoint.port, endpoint.host, () => {

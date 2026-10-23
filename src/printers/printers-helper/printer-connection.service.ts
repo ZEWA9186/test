@@ -4,7 +4,7 @@ import { Logger } from 'winston';
 
 import { PrinterConfig } from '../printer-config.entity';
 import { PrinterConfigService } from './printer-config.service';
-import { printerLogger } from '../../logger-winston/winston.config'
+import { printerLogger } from '../../logger-winston/winston.config';
 
 interface RuntimePrinter {
   printer: any;
@@ -22,7 +22,7 @@ export class PrinterConnectionService {
 
   /**
    * Здесь находятся принтеры, которые сейчас используются приложением.
- **/
+   **/
   private printers: Record<string, RuntimePrinter> = {};
 
   /**

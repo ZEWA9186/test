@@ -9,7 +9,7 @@ import { EntityManager, Repository } from 'typeorm';
 
 import { ActiveTaskEntity, ExpectedScanType } from '../entities/active-task.entity';
 import { PackagingTableManager } from './packaging-table-manager.service';
-import { AggregationLogger } from '../../logger-winston/winston.config';
+import { TaskPackagingStats, ContainerFillStats } from '../dto/responce.dto';
 
 export interface PackagingRecord {
   id: number;
@@ -19,33 +19,6 @@ export interface PackagingRecord {
   palletLabel: string | null;
   tsdId: number;
   createdAt: Date;
-}
-
-export interface ContainerFillStats {
-  label: string;
-  actualCount: number;
-  expectedCount: number;
-  isFull: boolean;
-  isOverfilled: boolean;
-  missingCount: number;
-  productCodes: string[];
-}
-
-export interface TaskPackagingStats {
-  totalRecords: number;
-  isValid: boolean;
-
-  productsWithoutPackaging: string[];
-  smallBoxesWithoutBigBox: string[];
-  bigBoxesWithoutPallet: string[];
-
-  productsWithoutPackagingCount: number;
-  smallBoxesWithoutBigBoxCount: number;
-  bigBoxesWithoutPalletCount: number;
-
-  smallBoxes: ContainerFillStats[];
-  bigBoxes: ContainerFillStats[];
-  pallets: ContainerFillStats[];
 }
 
 @Injectable()
@@ -97,6 +70,7 @@ export class AggregationRepository {
     manager?: EntityManager,
   ): Promise<number> {
     const table = this.getPackagingTable(activeTask);
+
     const rows: Array<{ count: string | number }> = await this.getManager(manager).query(
       `SELECT COUNT(*) AS count FROM ${table} WHERE ${whereSql}`,
       parameters,
@@ -105,84 +79,23 @@ export class AggregationRepository {
     return Number(rows[0]?.count ?? 0);
   }
 
-  private async withOperationLogging<T>(
-    activeTask: ActiveTaskEntity,
-    operation: string,
-    details: Record<string, unknown>,
-    action: () => Promise<T>,
-  ): Promise<T> {
-    const context = {
-      tsdId: activeTask.tsdId,
-      taskId: activeTask.taskId,
-      operation,
-      ...details,
-    };
-
-    try {
-      const result = await action();
-      AggregationLogger.info('Операция агрегации выполнена', {
-        ...context,
-        ...(Array.isArray(result) ? { affectedCount: result.length } : {}),
-      });
-      return result;
-    } catch (error) {
-      AggregationLogger.error('Ошибка операции агрегации', {
-        ...context,
-        error:
-          error instanceof Error
-            ? { name: error.name, message: error.message, stack: error.stack }
-            : error,
-      });
-      throw error;
-    }
-  }
-
-  private logRepositoryError(
-    operation: string,
-    context: Record<string, unknown>,
-    error: unknown,
-  ): void {
-    AggregationLogger.error('Ошибка в репозитории агрегации', {
-      operation,
-      ...context,
-      error:
-        error instanceof Error
-          ? { name: error.name, message: error.message, stack: error.stack }
-          : error,
-    });
-  }
-
   async getActiveTask(tsdId: number, manager?: EntityManager): Promise<ActiveTaskEntity> {
-    try {
-      const activeTask = await this.getActiveTaskRepository(manager).findOne({
-        where: { tsdId },
-      });
+    const activeTask = await this.getActiveTaskRepository(manager).findOne({
+      where: { tsdId },
+    });
 
-      if (!activeTask || !activeTask.taskId) {
-        throw new NotFoundException(`Для ТСД ${tsdId} нет активной задачи`);
-      }
-
-      return activeTask;
-    } catch (error) {
-      this.logRepositoryError('getActiveTask', { tsdId, taskId: null }, error);
-      throw error;
+    if (!activeTask || !activeTask.taskId) {
+      throw new NotFoundException(`Для ТСД ${tsdId} нет активной задачи`);
     }
+
+    return activeTask;
   }
 
   async saveActiveTask(
     activeTask: ActiveTaskEntity,
     manager?: EntityManager,
   ): Promise<ActiveTaskEntity> {
-    try {
-      return this.getActiveTaskRepository(manager).save(activeTask);
-    } catch (error) {
-      this.logRepositoryError(
-        'saveActiveTask',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
-    }
+    return this.getActiveTaskRepository(manager).save(activeTask);
   }
 
   async addProduct(
@@ -190,38 +103,31 @@ export class AggregationRepository {
     code: string,
     manager?: EntityManager,
   ): Promise<PackagingRecord> {
-    try {
-      const table = this.getPackagingTable(activeTask);
-      const rows: PackagingRecord[] = await this.getManager(manager).query(
-        `
-          INSERT INTO ${table} (code, tsd_id)
-          VALUES ($1, $2)
-          RETURNING
-            id,
-            code,
-            small_box_label AS "smallBoxLabel",
-            big_box_label AS "bigBoxLabel",
-            pallet_label AS "palletLabel",
-            tsd_id AS "tsdId",
-            created_at AS "createdAt"
-        `,
-        [code, activeTask.tsdId],
-      );
+    const table = this.getPackagingTable(activeTask);
 
-      const product = this.mapPackagingRow(rows[0]);
-      if (!product) {
-        throw new InternalServerErrorException('Не удалось добавить товар в фасовку');
-      }
+    const rows: PackagingRecord[] = await this.getManager(manager).query(
+      `
+        INSERT INTO ${table} (code, tsd_id)
+        VALUES ($1, $2)
+        RETURNING
+          id,
+          code,
+          small_box_label AS "smallBoxLabel",
+          big_box_label AS "bigBoxLabel",
+          pallet_label AS "palletLabel",
+          tsd_id AS "tsdId",
+          created_at AS "createdAt"
+      `,
+      [code, activeTask.tsdId],
+    );
 
-      return product;
-    } catch (error) {
-      this.logRepositoryError(
-        'addProduct',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
+    const product = this.mapPackagingRow(rows[0]);
+
+    if (!product) {
+      throw new InternalServerErrorException('Не удалось добавить товар в фасовку');
     }
+
+    return product;
   }
 
   /** Количество товаров в текущей открытой таре. */
@@ -229,44 +135,35 @@ export class AggregationRepository {
     activeTask: ActiveTaskEntity,
     manager?: EntityManager,
   ): Promise<number> {
-    try {
-      switch (activeTask.aggregationLvl) {
-        case 1:
-          return this.countRows(
-            activeTask,
-            'tsd_id = $1 AND pallet_label IS NULL',
-            [activeTask.tsdId],
-            manager,
-          );
+    switch (activeTask.aggregationLvl) {
+      case 1:
+        return this.countRows(
+          activeTask,
+          'tsd_id = $1 AND pallet_label IS NULL',
+          [activeTask.tsdId],
+          manager,
+        );
 
-        case 2:
-          return this.countRows(
-            activeTask,
-            'tsd_id = $1 AND big_box_label IS NULL',
-            [activeTask.tsdId],
-            manager,
-          );
+      case 2:
+        return this.countRows(
+          activeTask,
+          'tsd_id = $1 AND big_box_label IS NULL',
+          [activeTask.tsdId],
+          manager,
+        );
 
-        case 3:
-          return this.countRows(
-            activeTask,
-            'tsd_id = $1 AND small_box_label IS NULL',
-            [activeTask.tsdId],
-            manager,
-          );
+      case 3:
+        return this.countRows(
+          activeTask,
+          'tsd_id = $1 AND small_box_label IS NULL',
+          [activeTask.tsdId],
+          manager,
+        );
 
-        default:
-          throw new InternalServerErrorException(
-            `Неизвестный уровень агрегации: ${activeTask.aggregationLvl}`,
-          );
-      }
-    } catch (error) {
-      this.logRepositoryError(
-        'getOpenProductCount',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
+      default:
+        throw new InternalServerErrorException(
+          `Неизвестный уровень агрегации: ${activeTask.aggregationLvl}`,
+        );
     }
   }
 
@@ -275,23 +172,14 @@ export class AggregationRepository {
     activeTask: ActiveTaskEntity,
     manager?: EntityManager,
   ): Promise<number> {
-    try {
-      const recordsCount = await this.countRows(
-        activeTask,
-        'tsd_id = $1 AND small_box_label IS NOT NULL AND big_box_label IS NULL',
-        [activeTask.tsdId],
-        manager,
-      );
+    const recordsCount = await this.countRows(
+      activeTask,
+      'tsd_id = $1 AND small_box_label IS NOT NULL AND big_box_label IS NULL',
+      [activeTask.tsdId],
+      manager,
+    );
 
-      return recordsCount / activeTask.piecesPerSmallBox;
-    } catch (error) {
-      this.logRepositoryError(
-        'getClosedSmallBoxCount',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
-    }
+    return recordsCount / activeTask.piecesPerSmallBox;
   }
 
   /** Количество закрытых больших коробок, ещё не помещённых на паллету. */
@@ -299,27 +187,19 @@ export class AggregationRepository {
     activeTask: ActiveTaskEntity,
     manager?: EntityManager,
   ): Promise<number> {
-    try {
-      const productsPerBigBox =
-        activeTask.aggregationLvl === 2
-          ? activeTask.piecesPerBigBox
-          : activeTask.piecesPerSmallBox * activeTask.piecesPerBigBox;
-      const recordsCount = await this.countRows(
-        activeTask,
-        'tsd_id = $1 AND big_box_label IS NOT NULL AND pallet_label IS NULL',
-        [activeTask.tsdId],
-        manager,
-      );
+    const productsPerBigBox =
+      activeTask.aggregationLvl === 2
+        ? activeTask.piecesPerBigBox
+        : activeTask.piecesPerSmallBox * activeTask.piecesPerBigBox;
 
-      return recordsCount / productsPerBigBox;
-    } catch (error) {
-      this.logRepositoryError(
-        'getClosedBigBoxCount',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
-    }
+    const recordsCount = await this.countRows(
+      activeTask,
+      'tsd_id = $1 AND big_box_label IS NOT NULL AND pallet_label IS NULL',
+      [activeTask.tsdId],
+      manager,
+    );
+
+    return recordsCount / productsPerBigBox;
   }
 
   /** Закрывает текущую тару, присваивая этикетку товарам внутри неё. */
@@ -329,63 +209,58 @@ export class AggregationRepository {
     code: string,
     manager?: EntityManager,
   ): Promise<number> {
-    try {
-      const table = this.getPackagingTable(activeTask);
-      const em = this.getManager(manager);
+    const table = this.getPackagingTable(activeTask);
+    const em = this.getManager(manager);
 
-      const existsRows: Array<{ exists: boolean }> = await em.query(
-        `
-          SELECT EXISTS (
-            SELECT 1
-            FROM ${table}
-            WHERE small_box_label = $1
-               OR big_box_label = $1
-               OR pallet_label = $1
-          ) AS "exists"
-        `,
-        [code],
-      );
+    const existsRows: Array<{ exists: boolean }> = await em.query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM ${table}
+          WHERE small_box_label = $1
+             OR big_box_label = $1
+             OR pallet_label = $1
+        ) AS "exists"
+      `,
+      [code],
+    );
 
-      if (existsRows[0]?.exists === true) {
-        throw new BadRequestException(`Этикетка ${code} уже зарегистрирована в фасовке`);
-      }
-
-      let column: string;
-      switch (containerType) {
-        case ExpectedScanType.SMALL_BOX_LABEL:
-          column = 'small_box_label';
-          break;
-        case ExpectedScanType.BIG_BOX_LABEL:
-          column = 'big_box_label';
-          break;
-        case ExpectedScanType.PALLET_LABEL:
-          column = 'pallet_label';
-          break;
-        default:
-          throw new BadRequestException(`Неподдерживаемый тип контейнера: ${containerType}`);
-      }
-
-      // column выбирается только из фиксированного списка выше.
-      const updatedRows: Array<{ updated: number }> = await em.query(
-        `
-          UPDATE ${table}
-          SET ${column} = $1
-          WHERE tsd_id = $2
-            AND ${column} IS NULL
-          RETURNING 1 AS updated
-        `,
-        [code, activeTask.tsdId],
-      );
-
-      return updatedRows.length;
-    } catch (error) {
-      this.logRepositoryError(
-        'setContainerLabel',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
+    if (existsRows[0]?.exists === true) {
+      throw new BadRequestException(`Этикетка ${code} уже зарегистрирована в фасовке`);
     }
+
+    let column: string;
+
+    switch (containerType) {
+      case ExpectedScanType.SMALL_BOX_LABEL:
+        column = 'small_box_label';
+        break;
+
+      case ExpectedScanType.BIG_BOX_LABEL:
+        column = 'big_box_label';
+        break;
+
+      case ExpectedScanType.PALLET_LABEL:
+        column = 'pallet_label';
+        break;
+
+      default:
+        throw new BadRequestException(`Неподдерживаемый тип контейнера: ${containerType}`);
+    }
+
+    // column выбирается только из фиксированного списка выше.
+    const updatedRows: Array<{ updated: number }> = await em.query(
+      `
+        UPDATE ${table}
+        SET ${column} = $1
+        WHERE tsd_id = $2
+          AND ${column} IS NULL
+        RETURNING 1 AS updated
+      `,
+      [code, activeTask.tsdId],
+    );
+
+    return updatedRows.length;
   }
 
   async deleteProduct(
@@ -393,19 +268,18 @@ export class AggregationRepository {
     code: string,
     manager?: EntityManager,
   ): Promise<string> {
-    return this.withOperationLogging(activeTask, 'deleteProduct', { code }, async () => {
-      const table = this.getPackagingTable(activeTask);
-      const rows: Array<{ code: string }> = await this.getManager(manager).query(
-        `DELETE FROM ${table} WHERE code = $1 RETURNING code`,
-        [code],
-      );
+    const table = this.getPackagingTable(activeTask);
 
-      if (!rows.length) {
-        throw new NotFoundException(`Код ${code} не найден`);
-      }
+    const rows: Array<{ code: string }> = await this.getManager(manager).query(
+      `DELETE FROM ${table} WHERE code = $1 RETURNING code`,
+      [code],
+    );
 
-      return rows[0].code;
-    });
+    if (!rows.length) {
+      throw new NotFoundException(`Код ${code} не найден`);
+    }
+
+    return rows[0].code;
   }
 
   async deletePackage(
@@ -413,25 +287,24 @@ export class AggregationRepository {
     packageLabel: string,
     manager?: EntityManager,
   ): Promise<string[]> {
-    return this.withOperationLogging(activeTask, 'deletePackage', { packageLabel }, async () => {
-      const table = this.getPackagingTable(activeTask);
-      const rows: Array<{ code: string }> = await this.getManager(manager).query(
-        `
+    const table = this.getPackagingTable(activeTask);
+
+    const rows: Array<{ code: string }> = await this.getManager(manager).query(
+      `
           DELETE FROM ${table}
           WHERE small_box_label = $1
              OR big_box_label = $1
              OR pallet_label = $1
-            RETURNING code
+          RETURNING code
         `,
-        [packageLabel],
-      );
+      [packageLabel],
+    );
 
-      if (!rows.length) {
-        throw new NotFoundException(`Упаковка ${packageLabel} не найдена`);
-      }
+    if (!rows.length) {
+      throw new NotFoundException(`Упаковка ${packageLabel} не найдена`);
+    }
 
-      return rows.map((row) => row.code);
-    });
+    return rows.map((row) => row.code);
   }
 
   async addProductIntoPackage(
@@ -441,87 +314,86 @@ export class AggregationRepository {
     packageType: ExpectedScanType,
     manager?: EntityManager,
   ): Promise<PackagingRecord> {
-    return this.withOperationLogging(
-      activeTask,
-      'addProductIntoPackage',
-      { code, packageLabel, packageType },
-      async () => {
-        const table = this.getPackagingTable(activeTask);
-        const em = this.getManager(manager);
+    const table = this.getPackagingTable(activeTask);
+    const em = this.getManager(manager);
 
-        let column: string;
-        switch (packageType) {
-          case ExpectedScanType.SMALL_BOX_LABEL:
-            column = 'small_box_label';
-            break;
-          case ExpectedScanType.BIG_BOX_LABEL:
-            column = 'big_box_label';
-            break;
-          case ExpectedScanType.PALLET_LABEL:
-            column = 'pallet_label';
-            break;
-          default:
-            throw new BadRequestException(`Неизвестный тип тары: ${packageType}`);
-        }
+    let column: string;
 
-        const packageRows: Array<{
-          smallBoxLabel: string | null;
-          bigBoxLabel: string | null;
-          palletLabel: string | null;
-        }> = await em.query(
-          `
-          SELECT
-            small_box_label AS "smallBoxLabel",
-            big_box_label AS "bigBoxLabel",
-            pallet_label AS "palletLabel"
-          FROM ${table}
-          WHERE ${column} = $1
-          LIMIT 1
-        `,
-          [packageLabel],
-        );
+    switch (packageType) {
+      case ExpectedScanType.SMALL_BOX_LABEL:
+        column = 'small_box_label';
+        break;
 
-        const existingPackage = packageRows[0];
-        if (!existingPackage) {
-          throw new NotFoundException(`Тара ${packageLabel} не найдена в текущей задаче`);
-        }
+      case ExpectedScanType.BIG_BOX_LABEL:
+        column = 'big_box_label';
+        break;
 
-        const insertedRows: PackagingRecord[] = await em.query(
-          `
-          INSERT INTO ${table} (
-            code,
-            tsd_id,
-            small_box_label,
-            big_box_label,
-            pallet_label
-          )
-          VALUES ($1, $2, $3, $4, $5)
-          RETURNING
-            id,
-            code,
-            small_box_label AS "smallBoxLabel",
-            big_box_label AS "bigBoxLabel",
-            pallet_label AS "palletLabel",
-            tsd_id AS "tsdId",
-            created_at AS "createdAt"
-        `,
-          [
-            code,
-            activeTask.tsdId,
-            existingPackage.smallBoxLabel,
-            existingPackage.bigBoxLabel,
-            existingPackage.palletLabel,
-          ],
-        );
+      case ExpectedScanType.PALLET_LABEL:
+        column = 'pallet_label';
+        break;
 
-        const inserted = this.mapPackagingRow(insertedRows[0]);
-        if (!inserted) {
-          throw new InternalServerErrorException('Не удалось добавить товар в упаковку');
-        }
+      default:
+        throw new BadRequestException(`Неизвестный тип тары: ${packageType}`);
+    }
 
-        return inserted;
-      },
+    const packageRows: Array<{
+      smallBoxLabel: string | null;
+      bigBoxLabel: string | null;
+      palletLabel: string | null;
+    }> = await em.query(
+      `
+        SELECT
+          small_box_label AS "smallBoxLabel",
+          big_box_label AS "bigBoxLabel",
+          pallet_label AS "palletLabel"
+        FROM ${table}
+        WHERE ${column} = $1
+        LIMIT 1
+      `,
+      [packageLabel],
     );
+
+    const existingPackage = packageRows[0];
+
+    if (!existingPackage) {
+      throw new NotFoundException(`Тара ${packageLabel} не найдена в текущей задаче`);
+    }
+
+    const insertedRows: PackagingRecord[] = await em.query(
+      `
+        INSERT INTO ${table} (
+          code,
+          tsd_id,
+          small_box_label,
+          big_box_label,
+          pallet_label
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING
+          id,
+          code,
+          small_box_label AS "smallBoxLabel",
+          big_box_label AS "bigBoxLabel",
+          pallet_label AS "palletLabel",
+          tsd_id AS "tsdId",
+          created_at AS "createdAt"
+      `,
+      [
+        code,
+        activeTask.tsdId,
+        existingPackage.smallBoxLabel,
+        existingPackage.bigBoxLabel,
+        existingPackage.palletLabel,
+      ],
+    );
+
+    const inserted = this.mapPackagingRow(insertedRows[0]);
+
+    if (!inserted) {
+      throw new InternalServerErrorException('Не удалось добавить товар в упаковку');
+    }
+
+    return inserted;
   }
 
   async countProductsInPackage(
@@ -529,21 +401,12 @@ export class AggregationRepository {
     packageLabel: string,
     manager?: EntityManager,
   ): Promise<number> {
-    try {
-      return this.countRows(
-        activeTask,
-        '(small_box_label = $1 OR big_box_label = $1 OR pallet_label = $1)',
-        [packageLabel],
-        manager,
-      );
-    } catch (error) {
-      this.logRepositoryError(
-        'countProductsInPackage',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
-    }
+    return this.countRows(
+      activeTask,
+      '(small_box_label = $1 OR big_box_label = $1 OR pallet_label = $1)',
+      [packageLabel],
+      manager,
+    );
   }
 
   async searchProductInfo(
@@ -551,39 +414,32 @@ export class AggregationRepository {
     code: string,
     manager?: EntityManager,
   ): Promise<PackagingRecord> {
-    try {
-      const table = this.getPackagingTable(activeTask);
-      const rows: PackagingRecord[] = await this.getManager(manager).query(
-        `
-          SELECT
-            id,
-            code,
-            small_box_label AS "smallBoxLabel",
-            big_box_label AS "bigBoxLabel",
-            pallet_label AS "palletLabel",
-            tsd_id AS "tsdId",
-            created_at AS "createdAt"
-          FROM ${table}
-          WHERE code = $1
-          LIMIT 1
-        `,
-        [code],
-      );
+    const table = this.getPackagingTable(activeTask);
 
-      const product = this.mapPackagingRow(rows[0]);
-      if (!product) {
-        throw new NotFoundException('Товар не найден в текущей агрегации');
-      }
+    const rows: PackagingRecord[] = await this.getManager(manager).query(
+      `
+        SELECT
+          id,
+          code,
+          small_box_label AS "smallBoxLabel",
+          big_box_label AS "bigBoxLabel",
+          pallet_label AS "palletLabel",
+          tsd_id AS "tsdId",
+          created_at AS "createdAt"
+        FROM ${table}
+        WHERE code = $1
+        LIMIT 1
+      `,
+      [code],
+    );
 
-      return product;
-    } catch (error) {
-      this.logRepositoryError(
-        'searchProductInfo',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
+    const product = this.mapPackagingRow(rows[0]);
+
+    if (!product) {
+      throw new NotFoundException('Товар не найден в текущей агрегации');
     }
+
+    return product;
   }
 
   async searchPackageInfo(
@@ -592,27 +448,30 @@ export class AggregationRepository {
     scanType: ExpectedScanType,
     manager?: EntityManager,
   ): Promise<PackagingRecord> {
-    try {
-      const table = this.getPackagingTable(activeTask);
-      const em = this.getManager(manager);
+    const table = this.getPackagingTable(activeTask);
+    const em = this.getManager(manager);
 
-      let column: string;
-      switch (scanType) {
-        case ExpectedScanType.SMALL_BOX_LABEL:
-          column = 'small_box_label';
-          break;
-        case ExpectedScanType.BIG_BOX_LABEL:
-          column = 'big_box_label';
-          break;
-        case ExpectedScanType.PALLET_LABEL:
-          column = 'pallet_label';
-          break;
-        default:
-          throw new BadRequestException('Передан код не контейнера');
-      }
+    let column: string;
 
-      const rows: PackagingRecord[] = await em.query(
-        `
+    switch (scanType) {
+      case ExpectedScanType.SMALL_BOX_LABEL:
+        column = 'small_box_label';
+        break;
+
+      case ExpectedScanType.BIG_BOX_LABEL:
+        column = 'big_box_label';
+        break;
+
+      case ExpectedScanType.PALLET_LABEL:
+        column = 'pallet_label';
+        break;
+
+      default:
+        throw new BadRequestException('Передан код не контейнера');
+    }
+
+    const rows: PackagingRecord[] = await em.query(
+      `
         SELECT
           id,
           code,
@@ -625,23 +484,16 @@ export class AggregationRepository {
         WHERE ${column} = $1
         LIMIT 1
       `,
-        [packageLabel],
-      );
+      [packageLabel],
+    );
 
-      const packaging = this.mapPackagingRow(rows[0]);
-      if (!packaging) {
-        throw new NotFoundException('Упаковка не найдена в текущей агрегации');
-      }
+    const packaging = this.mapPackagingRow(rows[0]);
 
-      return packaging;
-    } catch (error) {
-      this.logRepositoryError(
-        'searchPackageInfo',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
+    if (!packaging) {
+      throw new NotFoundException('Упаковка не найдена в текущей агрегации');
     }
+
+    return packaging;
   }
 
   async moveBox(
@@ -650,13 +502,12 @@ export class AggregationRepository {
     activeTask: ActiveTaskEntity,
     manager?: EntityManager,
   ): Promise<void> {
-    return this.withOperationLogging(activeTask, 'moveBox', { boxLabel, palletLabel }, async () => {
-      const table = this.getPackagingTable(activeTask);
-      await this.getManager(manager).query(
-        `UPDATE ${table} SET pallet_label = $1 WHERE big_box_label = $2`,
-        [palletLabel, boxLabel],
-      );
-    });
+    const table = this.getPackagingTable(activeTask);
+
+    await this.getManager(manager).query(
+      `UPDATE ${table} SET pallet_label = $1 WHERE big_box_label = $2`,
+      [palletLabel, boxLabel],
+    );
   }
 
   async countPackageContents(
@@ -665,64 +516,65 @@ export class AggregationRepository {
     scanType: ExpectedScanType,
     manager?: EntityManager,
   ): Promise<number> {
-    try {
-      let column: string;
-      switch (scanType) {
-        case ExpectedScanType.SMALL_BOX_LABEL:
-          column = 'small_box_label';
-          break;
-        case ExpectedScanType.BIG_BOX_LABEL:
-          column = 'big_box_label';
-          break;
-        case ExpectedScanType.PALLET_LABEL:
-          column = 'pallet_label';
-          break;
-        default:
-          throw new BadRequestException('Невозможно посчитать содержимое упаковки');
-      }
+    let column: string;
 
-      const recordsCount = await this.countRows(
-        activeTask,
-        `${column} = $1`,
-        [packageLabel],
-        manager,
-      );
+    switch (scanType) {
+      case ExpectedScanType.SMALL_BOX_LABEL:
+        column = 'small_box_label';
+        break;
 
-      switch (scanType) {
-        case ExpectedScanType.SMALL_BOX_LABEL:
-          return recordsCount;
+      case ExpectedScanType.BIG_BOX_LABEL:
+        column = 'big_box_label';
+        break;
 
-        case ExpectedScanType.BIG_BOX_LABEL:
-          if (activeTask.aggregationLvl === 3) {
-            return recordsCount / activeTask.piecesPerSmallBox;
-          }
-          return recordsCount;
+      case ExpectedScanType.PALLET_LABEL:
+        column = 'pallet_label';
+        break;
 
-        case ExpectedScanType.PALLET_LABEL:
-          switch (activeTask.aggregationLvl) {
-            case 1:
-              return recordsCount;
-            case 2:
-              return recordsCount / activeTask.piecesPerBigBox;
-            case 3:
-              return recordsCount / (activeTask.piecesPerSmallBox * activeTask.piecesPerBigBox);
-            default:
-              throw new InternalServerErrorException(
-                `Неизвестный уровень агрегации: ${activeTask.aggregationLvl}`,
-              );
-          }
-        default:
-          throw new InternalServerErrorException(`Неизвестный тип контейнера: ${scanType}`);
-      }
-    } catch (error) {
-      this.logRepositoryError(
-        'countPackageContents',
-        { tsdId: activeTask.tsdId, taskId: activeTask.taskId },
-        error,
-      );
-      throw error;
+      default:
+        throw new BadRequestException('Невозможно посчитать содержимое упаковки');
+    }
+
+    const recordsCount = await this.countRows(
+      activeTask,
+      `${column} = $1`,
+      [packageLabel],
+      manager,
+    );
+
+    switch (scanType) {
+      case ExpectedScanType.SMALL_BOX_LABEL:
+        return recordsCount;
+
+      case ExpectedScanType.BIG_BOX_LABEL:
+        if (activeTask.aggregationLvl === 3) {
+          return recordsCount / activeTask.piecesPerSmallBox;
+        }
+
+        return recordsCount;
+
+      case ExpectedScanType.PALLET_LABEL:
+        switch (activeTask.aggregationLvl) {
+          case 1:
+            return recordsCount;
+
+          case 2:
+            return recordsCount / activeTask.piecesPerBigBox;
+
+          case 3:
+            return recordsCount / (activeTask.piecesPerSmallBox * activeTask.piecesPerBigBox);
+
+          default:
+            throw new InternalServerErrorException(
+              `Неизвестный уровень агрегации: ${activeTask.aggregationLvl}`,
+            );
+        }
+
+      default:
+        throw new InternalServerErrorException(`Неизвестный тип контейнера: ${scanType}`);
     }
   }
+
   async getTaskPackagingStats(
     activeTask: ActiveTaskEntity,
     manager?: EntityManager,
@@ -737,14 +589,14 @@ export class AggregationRepository {
       pallet_label: string | null;
     }[] = await currentManager.query(
       `
-      SELECT
-        code,
-        small_box_label,
-        big_box_label,
-        pallet_label
-      FROM ${table}
-      ORDER BY id
-    `,
+        SELECT
+          code,
+          small_box_label,
+          big_box_label,
+          pallet_label
+        FROM ${table}
+        ORDER BY id
+      `,
     );
 
     const aggregationLvl = Number(activeTask.aggregationLvl);

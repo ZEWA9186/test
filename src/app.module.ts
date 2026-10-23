@@ -2,7 +2,6 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
-import { TrialModule } from './trial/trial.module';
 import { CodeModule } from './code/code.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseProviders } from './database.providers';
@@ -24,7 +23,6 @@ import { UserModule } from './users/users.module';
     }),
     ScheduleModule.forRoot(),
     DatabaseProviders,
-    TrialModule,
     CodeModule,
     Task1sModule,
     LastPackageModule,
