@@ -135,44 +135,6 @@ export class AggregationRules {
     }
   }
 
-  static getContentsCount(
-    activeTask: ActiveTaskEntity,
-    scanType: ExpectedScanType,
-    recordsCount: number,
-  ): number {
-    switch (scanType) {
-      case ExpectedScanType.SMALL_BOX_LABEL:
-        return recordsCount;
-
-      case ExpectedScanType.BIG_BOX_LABEL:
-        if (activeTask.aggregationLvl === 3) {
-          return recordsCount / activeTask.piecesPerSmallBox;
-        }
-
-        return recordsCount;
-
-      case ExpectedScanType.PALLET_LABEL:
-        switch (activeTask.aggregationLvl) {
-          case 1:
-            return recordsCount;
-
-          case 2:
-            return recordsCount / activeTask.piecesPerBigBox;
-
-          case 3:
-            return recordsCount / (activeTask.piecesPerSmallBox * activeTask.piecesPerBigBox);
-
-          default:
-            throw new InternalServerErrorException(
-              `Неизвестный уровень агрегации: ${activeTask.aggregationLvl}`,
-            );
-        }
-
-      default:
-        throw new InternalServerErrorException(`Невозможно посчитать содержимое: ${scanType}`);
-    }
-  }
-
   static getContentsType(
     aggregationLvl: number,
     scanType: ExpectedScanType,

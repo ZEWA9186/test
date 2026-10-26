@@ -73,22 +73,6 @@ export class AggregationRepository {
     };
   }
 
-  private async countRows(
-    activeTask: ActiveTaskEntity,
-    whereSql: string,
-    parameters: unknown[],
-    manager?: EntityManager,
-  ): Promise<number> {
-    const table = this.getPackagingTable(activeTask);
-
-    const rows: Array<{ count: string | number }> = await this.getManager(manager).query(
-      `SELECT COUNT(*) AS count FROM ${table} WHERE ${whereSql}`,
-      parameters,
-    );
-
-    return Number(rows[0]?.count ?? 0);
-  }
-
   // ───────────────────────────── получение активной задачи ─────────────────────────────
 
   async getActiveTask(tsdId: number, manager?: EntityManager): Promise<ActiveTaskEntity> {
@@ -747,12 +731,18 @@ export class AggregationRepository {
     packageLabel: string,
     manager?: EntityManager,
   ): Promise<number> {
-    return this.countRows(
-      activeTask,
-      '(small_box_label = $1 OR big_box_label = $1 OR pallet_label = $1)',
+    const table = this.getPackagingTable(activeTask);
+
+    const rows: Array<{ count: number | string }> = await this.getManager(manager).query(
+      `SELECT COUNT(*)::int AS "count"
+       FROM ${table}
+       WHERE small_box_label = $1
+          OR big_box_label = $1
+          OR pallet_label = $1`,
       [packageLabel],
-      manager,
     );
+
+    return Number(rows[0]?.count ?? 0);
   }
 
   async countPackageContents(
@@ -761,15 +751,26 @@ export class AggregationRepository {
     scanType: ExpectedScanType,
     manager?: EntityManager,
   ): Promise<number> {
+    const table = this.getPackagingTable(activeTask);
     const column = AggregationRules.getColumnByScanType(scanType);
+    const contentsType = AggregationRules.getContentsType(activeTask.aggregationLvl, scanType);
 
-    const recordsCount = await this.countRows(
-      activeTask,
-      `${column} = $1`,
+    if (!contentsType) {
+      throw new BadRequestException('Невозможно посчитать содержимое упаковки');
+    }
+
+    const childColumn =
+      contentsType === ExpectedScanType.PRODUCT
+        ? 'code'
+        : AggregationRules.getColumnByScanType(contentsType);
+
+    const rows: Array<{ count: number | string }> = await this.getManager(manager).query(
+      `SELECT COUNT(DISTINCT ${childColumn})::int AS "count"
+       FROM ${table}
+       WHERE ${column} = $1`,
       [packageLabel],
-      manager,
     );
 
-    return AggregationRules.getContentsCount(activeTask, scanType, recordsCount);
+    return Number(rows[0]?.count ?? 0);
   }
 }
