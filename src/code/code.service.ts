@@ -98,10 +98,12 @@ export class CodeService {
 
   async batchDeleteCodes(codes: string[], manager?: EntityManager): Promise<void> {
     if (!codes?.length) {
+      console.log(213123123);
       return;
     }
 
     try {
+      console.log(codes);
       await this.getManager(manager).query('DELETE FROM "code_entity" WHERE "code" = ANY($1)', [
         codes,
       ]);

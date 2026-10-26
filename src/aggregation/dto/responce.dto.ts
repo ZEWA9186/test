@@ -21,7 +21,8 @@ export interface ContainerFillStats {
   isFull: boolean;
   isOverfilled: boolean;
   missingCount: number;
-  productCodes: string[];
+  /** Непосредственное содержимое: товары, малые или большие короба. */
+  contents: string[];
 }
 
 export interface TaskPackagingStats {

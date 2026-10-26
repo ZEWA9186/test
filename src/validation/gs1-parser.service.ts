@@ -7,6 +7,7 @@ import { getGLN } from '../config/config.env';
 @Injectable()
 export class Gs1ParserService {
   private readonly GS = '\x1D';
+  private readonly PRODUCT_CODE_PATTERN = /^01\d{14}21(?:.{8}|.{6})[\x1D]9[123]/;
 
   getScanType(code: string, activeTask: ActiveTaskEntity): ExpectedScanType {
     if (!code?.trim()) {
@@ -123,7 +124,7 @@ export class Gs1ParserService {
     return serialReference.replace(/^0+/, '') || '0';
   }
   private validateGtinFormat(gtin: string) {
-    if (!/^\d{14}$/.test(gtin)) {
+    if (this.PRODUCT_CODE_PATTERN.test(gtin)) {
       this.throwGs1Error(`Некорректный GTIN`);
     }
   }

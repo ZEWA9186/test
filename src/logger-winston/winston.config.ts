@@ -35,9 +35,11 @@ const createLogger = (filename: string) => {
             colors: { info: 'blue', error: 'red', warn: 'yellow' },
           }),
           winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-          winston.format.printf(
-            ({ timestamp, level, message }) => `[${filename}] ${timestamp} ${level}: ${message}`,
-          ),
+          winston.format.printf(({ timestamp, level, message, ...meta }) => {
+            const details = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : '';
+
+            return `[${filename}] ${timestamp} ${level}: ${message}${details}`;
+          }),
         ),
       }),
 

@@ -1,58 +1,54 @@
 import { Injectable } from '@nestjs/common';
 
 import { ActiveTaskEntity } from '../entities/active-task.entity';
-import { AggregationRepository } from '../repository/aggregation.repository';
 import { AggregationResponseDto } from '../dto/responce.dto';
+import { AggregationRules } from './aggregation.rules';
+import { AggregationCounts } from '../entities/aggregation-counts';
 
 @Injectable()
 export class AggregationProgressService {
-  constructor(private readonly aggregationRepository: AggregationRepository) {}
+  getProgress(activeTask: ActiveTaskEntity, counts: AggregationCounts): AggregationResponseDto {
+    const lvl = activeTask.aggregationLvl;
+    const expectedScan = AggregationRules.getExpectedScan(activeTask, counts);
 
-  async getProgress(activeTask: ActiveTaskEntity): Promise<AggregationResponseDto> {
-    const hasSmallBox = activeTask.aggregationLvl === 3;
-    const hasBigBox = activeTask.aggregationLvl === 2 || activeTask.aggregationLvl === 3;
-
-    let smallBox: AggregationResponseDto['smallBox'] = null;
-    let bigBox: AggregationResponseDto['bigBox'] = null;
-    let pallet: AggregationResponseDto['pallet'] = null;
-
-    // Малый короб: количество товаров, ещё не закрытых малым коробом.
-    if (hasSmallBox) {
-      const current = await this.aggregationRepository.getOpenProductCount(activeTask);
-
-      smallBox = {
-        current,
-        limit: activeTask.piecesPerSmallBox,
+    if (lvl === 1) {
+      return {
+        smallBox: null,
+        bigBox: null,
+        pallet: { current: counts.openProducts, limit: activeTask.piecesPerPallet },
+        expectedScan,
       };
     }
 
-    // Большой короб: малые короба либо товары, если малые короба не используются.
-    if (hasBigBox) {
-      const current = hasSmallBox
-        ? await this.aggregationRepository.getClosedSmallBoxCount(activeTask)
-        : await this.aggregationRepository.getOpenProductCount(activeTask);
-
-      bigBox = {
-        current,
-        limit: activeTask.piecesPerBigBox,
+    if (lvl === 2) {
+      return {
+        smallBox: null,
+        bigBox: {
+          current: counts.openProducts,
+          limit: activeTask.piecesPerBigBox,
+        },
+        pallet: {
+          current: counts.closedBigBoxes,
+          limit: activeTask.piecesPerPallet,
+        },
+        expectedScan,
       };
     }
-
-    // Палета: большие короба либо товары, если большие короба не используются.
-    const current = hasBigBox
-      ? await this.aggregationRepository.getClosedBigBoxCount(activeTask)
-      : await this.aggregationRepository.getOpenProductCount(activeTask);
-
-    pallet = {
-      current,
-      limit: activeTask.piecesPerPallet,
-    };
 
     return {
-      smallBox,
-      bigBox,
-      pallet,
-      expectedScan: activeTask.expectedScan,
+      smallBox: {
+        current: counts.openProducts,
+        limit: activeTask.piecesPerSmallBox,
+      },
+      bigBox: {
+        current: counts.closedSmallBoxes,
+        limit: activeTask.piecesPerBigBox,
+      },
+      pallet: {
+        current: counts.closedBigBoxes,
+        limit: activeTask.piecesPerPallet,
+      },
+      expectedScan,
     };
   }
 }

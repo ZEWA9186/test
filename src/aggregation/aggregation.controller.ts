@@ -54,9 +54,9 @@ export class AggregationController {
   @HttpCode(HttpStatus.OK)
   async moveBox(
     @Param('id', ParseIntPipe) tsdId: number,
-    @Body() body: { boxLabel: string; palletLabel: string },
+    @Body() body: { innerLabel: string; outerLabel: string },
   ) {
-    await this.aggregationService.moveBox(body.boxLabel, body.palletLabel, tsdId);
+    await this.aggregationService.moveBox(body.innerLabel, body.outerLabel, tsdId);
   }
 
   @Post(':id/delete-code')

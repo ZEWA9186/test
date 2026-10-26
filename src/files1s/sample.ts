@@ -84,7 +84,7 @@ export const TASK: IDefaultTask[] = [
   },
   {
     name: 'piecesPerPallet',
-    label: 'Количество в палете',
+    label: 'Количество в паллете',
     comment: '',
     required: true,
   },
