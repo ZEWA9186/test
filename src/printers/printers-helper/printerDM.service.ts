@@ -46,7 +46,7 @@ export class PrinterDMService {
       const templatePath = path.join(getTemplateDirectory(), 'template.prn');
 
       this.logger.debug(`[PRINTER] Шаблон: ${templatePath}`);
-
+      //TODO расчёт длинны кода, разбиение на строки n длинны
       const templateContent = await fs.readFile(templatePath, 'utf-8');
 
       const commands = templateContent

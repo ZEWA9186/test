@@ -1,16 +1,16 @@
 import { GenerateOptions, LABEL_FORMATS, PrintersTypes } from './types';
 import { getGLN, getPrinterType } from '../config/config.env';
 
-export const getBoxNetto = (productNetto: number, count: number) => {
-  return productNetto * count;
+export const getBoxNetto = (productNetto: string, count: number) => {
+  return Number(productNetto) * count;
 };
 
-export const getNettoUnitKG = (productNetto: number) => {
-  return productNetto / 1000;
+export const getNettoUnitKG = (productNetto: string) => {
+  return Number(productNetto) / 1000;
 };
 
-export const getBoxNettoKG = (productNetto: number, count: number) => {
-  return (productNetto * count) / 1000;
+export const getBoxNettoKG = (productNetto: string, count: number) => {
+  return (Number(productNetto) * count) / 1000;
 };
 
 // ============ КОНФИГУРАЦИЯ ============
@@ -404,7 +404,7 @@ export const generateDatabaseCipher = (
 const calculateControlSum = (tempLabel: string) => {
   let sum = 0;
   for (let i = 0; i < 17; i++) {
-    sum += Number(tempLabel) * (i % 2 === 0 ? 3 : 1);
+    sum += Number(tempLabel[i]) * (i % 2 === 0 ? 3 : 1);
   }
 
   return `${tempLabel}${(10 - (sum % 10)) % 10}`;

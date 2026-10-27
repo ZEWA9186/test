@@ -134,7 +134,6 @@ export class Gs1ParserService {
   }
 
   private throwGs1Error(message: string): never {
-    loggerGS1.error(message);
     throw new BadRequestException(message);
   }
 }

@@ -27,6 +27,7 @@ export interface ContainerFillStats {
 
 export interface TaskPackagingStats {
   totalRecords: number;
+  requiredRecords?: number;
   isValid: boolean;
 
   productsWithoutPackaging: string[];

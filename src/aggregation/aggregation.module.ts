@@ -9,9 +9,14 @@ import { AggregationProductService } from './helper-service/aggregation-product.
 import { PackagingTableManager } from './repository/packaging-table-manager.service';
 import { ValidationModule } from '../validation/validation.module';
 import { AggregationProgressService } from './helper-service/aggregation-progress.service';
+import { TaskCodesEntity } from '../task/entities/task-codes.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ActiveTaskEntity]), CodeModule, ValidationModule],
+  imports: [
+    TypeOrmModule.forFeature([ActiveTaskEntity, TaskCodesEntity]),
+    CodeModule,
+    ValidationModule,
+  ],
   controllers: [AggregationController],
   providers: [
     AggregationService,

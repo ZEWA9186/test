@@ -17,7 +17,7 @@ export class NomenclatureEntity {
   @Column({ name: 'itf_14', type: 'varchar', length: 14, nullable: true })
   ITF14: string;
 
-  @Column({ name: 'EAN13', type: 'varchar', length: 14, nullable: true })
+  @Column({ name: 'ean_13', type: 'varchar', length: 14, nullable: true })
   EAN13: string;
 
   @Column({ name: 'small_box_lable', type: 'varchar', nullable: true })

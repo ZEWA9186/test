@@ -48,7 +48,7 @@ export class TaskService {
 
   async getTaskById(id: number): Promise<TaskEntity | null> {
     return await this.taskRepository.findOne({
-      where: { id },
+      where: { id: id },
     });
   }
 

@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 
 import { ActiveTaskEntity, ExpectedScanType } from './entities/active-task.entity';
 import { AggregationRepository } from './repository/aggregation.repository';
@@ -12,6 +12,8 @@ import { Gs1ParserService } from '../validation/gs1-parser.service';
 import { withOperationLogging } from './helper-service/aggregation-operation-logger';
 import { AggregationProgressService } from './helper-service/aggregation-progress.service';
 import { getScanTypeLabel } from './helper-service/aggregation-scan-label';
+import { TaskCodesEntity } from '../task/entities/task-codes.entity';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class AggregationService {
@@ -22,6 +24,8 @@ export class AggregationService {
     private readonly codeService: CodeService,
     private readonly gs1Parser: Gs1ParserService,
     private readonly aggregationProgressService: AggregationProgressService,
+    @InjectRepository(TaskCodesEntity)
+    private readonly taskCodesRepository: Repository<TaskCodesEntity>,
   ) {}
 
   async processScan(tsdId: number, code: string) {
@@ -206,9 +210,17 @@ export class AggregationService {
           label: formatCode(container.label),
           contents: container.contents.map(formatCode),
         }));
+      if (activeTask.taskId === null) throw new InternalServerErrorException();
+      const taskCodesCount = await this.taskCodesRepository.count({
+        where: { taskId: activeTask.taskId },
+      });
+      if (stats.totalRecords < taskCodesCount || stats.totalRecords > taskCodesCount) {
+        stats.isValid = false;
+      }
 
       return {
         ...stats,
+        requiredRecords: taskCodesCount,
         productsWithoutPackaging: stats.productsWithoutPackaging.map(formatCode),
         smallBoxesWithoutBigBox: stats.smallBoxesWithoutBigBox.map(formatCode),
         bigBoxesWithoutPallet: stats.bigBoxesWithoutPallet.map(formatCode),

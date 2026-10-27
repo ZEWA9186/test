@@ -58,6 +58,7 @@
     "node-machine-id": "^1.1.12",
     "node-thermal-printer": "^4.4.5",
     "node-zpl": "^1.0.5",
+    "parse-gs1-barcode": "^1.0.2",
     "pg": "^8.13.1",
     "ping": "^0.4.4",
     "reflect-metadata": "^0.2.0",

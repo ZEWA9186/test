@@ -10,6 +10,7 @@ import { promisify } from 'util';
 import * as dotenv from 'dotenv';
 import { EncodingType } from './types';
 import { getPcName, getPrinterDecodeType, getPrinterEncodeType } from '../config/config.env';
+import { TaskEntity } from '../task/entities/task.entity';
 dotenv.config();
 const execAsync = promisify(exec);
 
@@ -21,7 +22,7 @@ export async function printLabelBox(
   boxNumber: number,
   countInBox: number,
   printer: any,
-  task: any,
+  task: TaskEntity,
   logger: Logger,
   printerName: any,
 ) {
@@ -45,17 +46,12 @@ export async function printLabelBox(
     const data = await fs.promises.readFile(`${getTemplateDirectory()}/${label}.prn`);
     const decodedData = iconv.decode(data, decoding);
     let modifiedData = decodedData;
-    const taskKeys = Object.keys(task);
-    taskKeys.forEach((key) => {
-      const placeholder = `<${key}>`;
-      const value = task[key];
-      modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
-    });
 
     const sscc = generateLabel('8', `${boxNumber}`);
+    const ssccDis = `(00)` + sscc.slice(2);
 
     modifiedData = modifiedData
-      .replace('<nnn_package>', `${boxNumber}`)
+      .replace('<gs1128_dis>', `${ssccDis}`)
       .replace('<nnn_pallet>', `${boxNumber}`)
       .replace('<nnn_pieces_per_package>', `${countInBox}`)
       .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
@@ -118,17 +114,12 @@ export async function printLabelSmallBox(
     const data = await fs.promises.readFile(`${getTemplateDirectory()}/${label}.prn`);
     const decodedData = iconv.decode(data, decoding);
     let modifiedData = decodedData;
-    const taskKeys = Object.keys(task);
-    taskKeys.forEach((key) => {
-      const placeholder = `<${key}>`;
-      const value = task[key];
-      modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
-    });
 
     const sscc = generateLabel('7', `${boxNumber}`);
+    const ssccDis = `(00)` + sscc.slice(2);
 
     modifiedData = modifiedData
-      .replace('<nnn_package>', `${boxNumber}`)
+      .replace('<gs1128_dis>', `${ssccDis}`)
       .replace('<nnn_pallet>', `${boxNumber}`)
       .replace('<nnn_pieces_per_package>', `${countInBox}`)
       .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
@@ -195,21 +186,17 @@ export async function printLabelPallet(
       }
       const decodedData = iconv.decode(data, decoding);
       let modifiedData = decodedData;
-      const taskKeys = Object.keys(task);
-      taskKeys.forEach((key) => {
-        const placeholder = `<${key}>`;
-        const value = task[key];
-        modifiedData = modifiedData.replace(new RegExp(placeholder, 'g'), value);
-      });
+
       // Заменяем <nnn_items_per_pallet> на значение или пробел, если не указано
       const itemsPerPalletValue = itemsPerPallet ? `${itemsPerPallet}` : '';
 
       const sscc = generateLabel('9', `${palletNumber}`);
+      const ssccDis = `(00)` + sscc.slice(2);
 
       modifiedData = modifiedData
         .replace('<nnn_pallet>', `${palletNumber}`)
         .replace('<nnn_items_per_pallet>', itemsPerPalletValue) // Используем подготовленное значение
-        .replace('<nnn_box_per_pallet>', `${countInPallet}`)
+        .replace('<gs1128_dis>', `${ssccDis}`)
         .replace('<gs1128_dm>', sscc);
       const encodedData = iconv.encode(modifiedData, encoding);
       const newFileName = `${getTemplateDirectory()}\\${Date.now()}.prn`.replace(/\//g, '\\');

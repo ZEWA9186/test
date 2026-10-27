@@ -27,8 +27,6 @@ export interface PackagingRecord {
   createdAt: Date;
 }
 
-
-
 @Injectable()
 export class AggregationRepository {
   constructor(
@@ -244,18 +242,11 @@ export class AggregationRepository {
     );
 
     for (const rule of rules) {
-      statsByScanType.set(
-        rule.scanType,
-        await this.getContainerStats(activeTask, rule, manager),
-      );
+      statsByScanType.set(rule.scanType, await this.getContainerStats(activeTask, rule, manager));
     }
 
-    const smallBoxRule = rules.find(
-      (rule) => rule.scanType === ExpectedScanType.SMALL_BOX_LABEL,
-    );
-    const bigBoxRule = rules.find(
-      (rule) => rule.scanType === ExpectedScanType.BIG_BOX_LABEL,
-    );
+    const smallBoxRule = rules.find((rule) => rule.scanType === ExpectedScanType.SMALL_BOX_LABEL);
+    const bigBoxRule = rules.find((rule) => rule.scanType === ExpectedScanType.BIG_BOX_LABEL);
 
     const smallBoxes = statsByScanType.get(ExpectedScanType.SMALL_BOX_LABEL) ?? [];
     const bigBoxes = statsByScanType.get(ExpectedScanType.BIG_BOX_LABEL) ?? [];
