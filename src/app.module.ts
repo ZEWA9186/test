@@ -15,6 +15,7 @@ import { NomenclaturesModule } from './nomenclatures/nomenclatures.module';
 import { AppGateway } from './app.gateway';
 import { Module } from '@nestjs/common';
 import { UserModule } from './users/users.module';
+import { ConfigValidationService } from './config/config-validation.service';
 
 @Module({
   imports: [
@@ -35,6 +36,6 @@ import { UserModule } from './users/users.module';
     UserModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, ConfigValidationService],
 })
 export class AppModule {}

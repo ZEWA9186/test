@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AggregationController } from './aggregation.controller';
-import { AggregationService } from './aggregation.service';
+import { AggregationService } from './service/aggregation.service';
 import { ActiveTaskEntity } from './entities/active-task.entity';
 import { CodeModule } from '../code/code.module';
 import { AggregationRepository } from './repository/aggregation.repository';
-import { AggregationProductService } from './helper-service/aggregation-product.service';
 import { PackagingTableManager } from './repository/packaging-table-manager.service';
 import { ValidationModule } from '../validation/validation.module';
-import { AggregationProgressService } from './helper-service/aggregation-progress.service';
 import { TaskCodesEntity } from '../task/entities/task-codes.entity';
+import { AggregationManualService } from './service/aggregation-manual.service';
+import { AggregationReportService } from './service/aggregation-report.service';
+import { AggregationSharedService } from './service/aggregation-shared.service';
 
 @Module({
   imports: [
@@ -19,11 +20,12 @@ import { TaskCodesEntity } from '../task/entities/task-codes.entity';
   ],
   controllers: [AggregationController],
   providers: [
+    AggregationSharedService,
     AggregationService,
+    AggregationManualService,
+    AggregationReportService,
     AggregationRepository,
-    AggregationProductService,
     PackagingTableManager,
-    AggregationProgressService,
   ],
   exports: [AggregationService, PackagingTableManager],
 })

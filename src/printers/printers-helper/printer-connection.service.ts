@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { printer } from 'node-thermal-printer';
 import { Logger } from 'winston';
 
 import { PrinterConfig } from '../printer-config.entity';
@@ -7,7 +6,6 @@ import { PrinterConfigService } from './printer-config.service';
 import { printerLogger } from '../../logger-winston/winston.config';
 
 interface RuntimePrinter {
-  printer: any;
   host: string;
   port: number;
   isConnected: boolean;
@@ -20,14 +18,8 @@ export class PrinterConnectionService {
     @Inject('winston') private readonly logger: Logger = printerLogger,
   ) {}
 
-  /**
-   * Здесь находятся принтеры, которые сейчас используются приложением.
-   **/
   private printers: Record<string, RuntimePrinter> = {};
 
-  /**
-   * Загружаем конфигурации из БД
-   */
   async initialize(): Promise<void> {
     const configs = await this.printerConfigService.findAll();
 
@@ -40,38 +32,14 @@ export class PrinterConnectionService {
     }
   }
 
-  /**
-   * Создание runtime-объекта принтера.
-   * */
   async connect(config: PrinterConfig): Promise<void> {
-    this.logger.info(`Принтер: подключение ${config.name} (${config.host}:${config.port})`);
+    this.printers[config.name] = {
+      host: config.host,
+      port: config.port,
+      isConnected: false,
+    };
 
-    try {
-      const host = config.host;
-      const port = config.port;
-
-      const printerInstance = new printer({
-        interface: `tcp://${host}:${port}`,
-      });
-
-      this.printers[config.name] = {
-        printer: printerInstance,
-        host,
-        port,
-        isConnected: true,
-      };
-
-      this.logger.info(`Принтер: ${config.name} добавлен в runtime`);
-    } catch (error) {
-      this.printers[config.name] = {
-        printer: null,
-        host: config.host,
-        port: config.port,
-        isConnected: false,
-      };
-
-      this.logger.error(`Принтер: ошибка подключения ${config.name}:`, error);
-    }
+    this.logger.info(`Принтер: ${config.name} добавлен в runtime (${config.host}:${config.port})`);
   }
 
   async applyConfig(config: PrinterConfig): Promise<void> {
@@ -87,10 +55,6 @@ export class PrinterConnectionService {
     delete this.printers[name];
 
     this.logger.info(`Принтер: ${name} удалён из runtime`);
-  }
-
-  getPrinter(name: string): any | null {
-    return this.printers[name]?.printer ?? null;
   }
 
   getEndpoint(name: string): { host: string; port: number } | null {

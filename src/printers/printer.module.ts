@@ -5,11 +5,10 @@ import { PrinterConfigRepository } from './printer-config.repository';
 import { PrinterController } from './printer.controller';
 import { PrinterConfig } from './printer-config.entity';
 import { printerLogger } from '../logger-winston/winston.config';
-import { PrinterDMService } from './printers-helper/printerDM.service';
 import { PrinterConfigService } from './printers-helper/printer-config.service';
 import { PrinterConnectionService } from './printers-helper/printer-connection.service';
+import { PrinterTransportService } from './printers-helper/printer-transport.service';
 import { PrinterMonitoringService } from './printers-helper/printer-monitoring.service';
-import { PrinterQueueService } from './printers-helper/printer-queue.service';
 import { TaskModule } from '../task/task.module';
 import { AppGateway } from '../app.gateway';
 import { LastPackageModule } from '../last-package/last-package.module';
@@ -20,12 +19,11 @@ import { LastPackageModule } from '../last-package/last-package.module';
   providers: [
     PrinterService,
     PrinterConfigRepository,
-    PrinterDMService,
     { provide: 'winston', useValue: printerLogger },
     PrinterConfigService,
     PrinterConnectionService,
+    PrinterTransportService,
     PrinterMonitoringService,
-    PrinterQueueService,
     AppGateway,
   ],
   exports: [PrinterService, PrinterConfigRepository],

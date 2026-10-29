@@ -1,9 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { json, urlencoded } from 'express';
+import { ConfigValidationService } from './config/config-validation.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configValidation = app.get(ConfigValidationService);
+  await configValidation.validateConfig();
+  await configValidation.initDirectories();
 
   app.enableCors({
     origin: '*',

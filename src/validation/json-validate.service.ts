@@ -13,10 +13,18 @@ export class JsonValidationService {
   constructor(private readonly codeValidationService: CodeValidationService) {}
 
   async validateJson(jsonData: any): Promise<TaskValidationResult> {
+    if (!jsonData || typeof jsonData !== 'object' || Array.isArray(jsonData)) {
+      return {
+        errors: ['Ожидается JSON-объект'],
+        items: [],
+      };
+    }
+
     const errors: string[] = [];
     const items: string[] = [];
     let codes: string[] = [];
 
+    const aggregationLevel = Number(jsonData.aggregationLvl);
     const templateDir = getJsonDirectory1STemplate();
     let templateFields: string[] = [];
 
@@ -60,10 +68,12 @@ export class JsonValidationService {
 
     const activeFields = TASK.filter((field) => templateFields.includes(field.name));
 
-    // 3. Проверяем наличие всех полей из шаблона в JSON
+    // 3. Проверяем наличие полей из шаблона в JSON
     for (const fieldName of templateFields) {
-      if (!(fieldName in jsonData)) {
-        const fieldInfo = TASK.find((f) => f.name === fieldName);
+      const fieldInfo = TASK.find((field) => field.name === fieldName);
+      const required = fieldInfo ? this.isRequiredForLevel(fieldInfo, aggregationLevel) : true;
+
+      if (required && !(fieldName in jsonData)) {
         const fieldLabel = fieldInfo?.label || fieldName;
         errors.push(`Отсутствует обязательное поле: ${fieldLabel}`);
         items.push(fieldName);
@@ -74,21 +84,24 @@ export class JsonValidationService {
     for (const field of activeFields) {
       const value = jsonData[field.name];
 
-      // Пропускаем если поле не в шаблоне или разрешен пробел
       if (!templateFields.includes(field.name) || (field.allowSpace && value === ' ')) {
         continue;
       }
 
-      // Проверка обязательных полей
-      if (field.required) {
-        if (value === undefined || value === null || value === '' || value === ' ') {
-          errors.push(`Обязательное поле ${field.label} не может быть пустым`);
-          items.push(field.name);
-          continue;
-        }
+      const required = this.isRequiredForLevel(field, aggregationLevel);
+      const isEmpty =
+        value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+
+      if (required && isEmpty) {
+        errors.push(`Обязательное поле ${field.label} не может быть пустым`);
+        items.push(field.name);
+        continue;
       }
 
-      // Специфические проверки
+      if (isEmpty) {
+        continue;
+      }
+
       switch (field.name) {
         case 'gtin':
         case 'ITF14':
@@ -98,19 +111,24 @@ export class JsonValidationService {
           }
           break;
 
-        case 'date_manufacture':
-        case 'date_expiration':
+        case 'dateManufacture':
+        case 'dateExpiration':
           if (!/^\d{2}\.\d{2}\.\d{4}$/.test(value)) {
             errors.push(`${field.label} должен быть в формате ДД.ММ.ГГГГ`);
             items.push(field.name);
           }
           break;
 
-        case 'startCorob':
-        case 'startPallet':
-        case 'pieces_per_package':
-        case 'packaging_per_pallet':
-        case 'workSH':
+        case 'aggregationLvl':
+          if (!/^\d+$/.test(value) || ![1, 2, 3].includes(Number(value))) {
+            errors.push(`${field.label} должен быть 1, 2 или 3`);
+            items.push(field.name);
+          }
+          break;
+
+        case 'piecesPerSmallBox':
+        case 'piecesPerBigBox':
+        case 'piecesPerPallet':
           if (!/^\d+$/.test(value) || parseInt(value, 10) <= 0) {
             errors.push(`${field.label} должно быть целым числом > 0`);
             items.push(field.name);
@@ -125,6 +143,7 @@ export class JsonValidationService {
             items.push(field.name);
           }
           break;
+
         case 'codes': {
           try {
             const codeValidation = isCodeFilterEnabled()
@@ -146,9 +165,10 @@ export class JsonValidationService {
           }
           break;
         }
-        case 'small_box_lable':
-        case 'big_box_lable':
-        case 'pallet_lable':
+
+        case 'smallBoxLabel':
+        case 'bigBoxLabel':
+        case 'palletLabel': {
           const templateDirectory = getTemplateDirectory();
           const templateFilePath = path.join(templateDirectory, `${value}.prn`);
 
@@ -159,9 +179,30 @@ export class JsonValidationService {
             items.push(field.name);
           }
           break;
+        }
       }
     }
 
     return { codes, errors, items };
+  }
+
+  private isRequiredForLevel(field: (typeof TASK)[number], aggregationLevel: number): boolean {
+    if (field.name === 'smallBoxLabel') {
+      return aggregationLevel === 3;
+    }
+
+    if (field.name === 'bigBoxLabel') {
+      return aggregationLevel >= 2;
+    }
+
+    if (field.name === 'piecesPerSmallBox') {
+      return aggregationLevel === 3;
+    }
+
+    if (field.name === 'piecesPerBigBox') {
+      return aggregationLevel >= 2;
+    }
+
+    return field.required === true;
   }
 }

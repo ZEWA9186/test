@@ -33,10 +33,6 @@ interface ReportPallet {
 
 type ReportObject = Record<string, unknown>;
 
-type TaskWithDocId = TaskEntity & {
-  docId?: string | null;
-};
-
 @Injectable()
 export class ReportService {
   private readonly localReportsDirectory: string;
@@ -59,7 +55,6 @@ export class ReportService {
     // Основной JSON-файл.
     await this.writeToRecordsFile(report, path.join(this.localReportsDirectory, fileName));
 
-    // TXT со всеми кодами. Ошибка создания TXT не прерывает сохранение отчёта.
     try {
       await this.createCodesTextFile(
         records.map((record) => record.code),
@@ -69,7 +64,6 @@ export class ReportService {
       console.error(`Не удалось создать TXT-файл с кодами задания ${task.id}`, error);
     }
 
-    // Копия на FTP или в каталог 1С, при ошибке — резервный JSON.
     await this.saveExternalCopy(report, fileName);
 
     return report;
@@ -174,7 +168,7 @@ export class ReportService {
     };
   }
 
-  private createDefaultHeader(task: TaskWithDocId) {
+  private createDefaultHeader(task: TaskEntity) {
     return {
       docId: task.docId || '20240724-2401',
       level: task.aggregationLvl,

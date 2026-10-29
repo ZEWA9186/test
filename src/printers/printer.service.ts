@@ -1,8 +1,19 @@
-import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  OnModuleInit,
+  BadRequestException,
+  HttpException,
+} from '@nestjs/common';
 
 import { Logger } from 'winston';
 
-import { printLabelBox, printLabelPallet, printLabelSmallBox } from './printer.utils';
+import {
+  buildBigBoxLabelFile,
+  buildDmCodeCommands,
+  buildPalletLabelFile,
+  buildSmallBoxLabelFile,
+} from './printer.utils';
 
 import { printerLogger } from '../logger-winston/winston.config';
 
@@ -11,9 +22,9 @@ import { PrinterConfig } from './printer-config.entity';
 
 import { PrinterConfigService } from './printers-helper/printer-config.service';
 import { PrinterConnectionService } from './printers-helper/printer-connection.service';
+import { PrinterTransportService } from './printers-helper/printer-transport.service';
 
 import { TaskService } from '../task/task.service';
-import { PrinterDMService } from './printers-helper/printerDM.service';
 import { LastPackageService } from '../last-package/last-package.service';
 import { getPrinterName } from '../config/config.env';
 
@@ -22,14 +33,13 @@ export class PrinterService implements OnModuleInit {
   constructor(
     private readonly printerConfigService: PrinterConfigService,
     private readonly printerConnectionService: PrinterConnectionService,
+    private readonly printerTransportService: PrinterTransportService,
 
     private readonly taskService: TaskService,
     private readonly lastPackageService: LastPackageService,
 
     @Inject('winston')
     private readonly logger: Logger = printerLogger,
-
-    private readonly printerDMService: PrinterDMService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -65,17 +75,26 @@ export class PrinterService implements OnModuleInit {
 
   public async printAllDM(id: number): Promise<void> {
     try {
-      const codes = await this.taskService.getCodesByTaskId(id);
+      const codes = await this.taskService.getCodesToPrintByTaskId(id);
 
       for (const code of codes) {
-        await this.printerDMService.printCode(code);
-
+        await this.printDmCode(code);
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (err) {
       this.logger.error(`Ошибка печати датаматриксов для задачи ${id}`, err);
 
       throw new BadRequestException(`Ошибка печати датаматриксов для задачи ${id}`);
+    }
+  }
+
+  private async printDmCode(code: string): Promise<void> {
+    try {
+      const commands = await buildDmCodeCommands(code);
+
+      await this.printerTransportService.sendCommands(PrinterLabels.Printer2, commands);
+    } catch (error) {
+      this.logger.error('[PRINTER] Ошибка печати кода:', error);
     }
   }
 
@@ -142,9 +161,9 @@ export class PrinterService implements OnModuleInit {
   }
 
   public async printSmallBoxLabel(boxNumber: number, taskId: number): Promise<void> {
-    const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer1);
+    const endpoint = this.printerConnectionService.getEndpoint(PrinterLabels.Printer1);
 
-    if (!printer) {
+    if (!endpoint) {
       this.logger.error(`Принтер ${PrinterLabels.Printer1} не подключён`);
       return;
     }
@@ -159,16 +178,13 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов в малой коробке');
     }
 
-    const printerName = getPrinterName();
-
     try {
-      await printLabelSmallBox(
-        boxNumber,
-        task.piecesPerSmallBox,
-        printer,
-        task,
-        this.logger,
-        printerName,
+      const data = await buildSmallBoxLabelFile(boxNumber, task.piecesPerSmallBox, task);
+
+      await this.printerTransportService.sendFile(
+        getPrinterName(),
+        data,
+        `малой коробки ${boxNumber}`,
       );
     } catch (err) {
       this.logger.error('Ошибка печати этикетки малой коробки:', err);
@@ -176,9 +192,9 @@ export class PrinterService implements OnModuleInit {
   }
 
   public async printBigBoxLabel(boxNumber: number, taskId: number): Promise<void> {
-    const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer1);
+    const endpoint = this.printerConnectionService.getEndpoint(PrinterLabels.Printer1);
 
-    if (!printer) {
+    if (!endpoint) {
       this.logger.error(`Принтер ${PrinterLabels.Printer1} не подключён`);
       return;
     }
@@ -193,12 +209,14 @@ export class PrinterService implements OnModuleInit {
       throw new BadRequestException('В задаче не указано количество продуктов в большой коробке');
     }
 
-    const ProductsInBigBox = await this.taskService.getProductsInBigBox(taskId);
-    //TODO Исправить генератор, добавить количество продуктов в коробке
-    const printerName = getPrinterName();
-
     try {
-      await printLabelBox(boxNumber, task.piecesPerBigBox, printer, task, this.logger, printerName);
+      const data = await buildBigBoxLabelFile(boxNumber, task.piecesPerBigBox, task);
+
+      await this.printerTransportService.sendFile(
+        getPrinterName(),
+        data,
+        `большой коробки ${boxNumber}`,
+      );
     } catch (err) {
       this.logger.error('Ошибка печати этикетки большой коробки:', err);
     }
@@ -206,9 +224,9 @@ export class PrinterService implements OnModuleInit {
 
   public async printPalletLabel(palletNumber: number, taskId: number): Promise<void> {
     try {
-      const printer = this.printerConnectionService.getPrinter(PrinterLabels.Printer1);
+      const endpoint = this.printerConnectionService.getEndpoint(PrinterLabels.Printer1);
 
-      if (!printer) {
+      if (!endpoint) {
         this.logger.error(`Принтер ${PrinterLabels.Printer1} не подключён`);
         return;
       }
@@ -224,20 +242,18 @@ export class PrinterService implements OnModuleInit {
       }
 
       const productsInPallet = await this.taskService.getProductsInPalletId(taskId);
+      const data = await buildPalletLabelFile(palletNumber, task, productsInPallet);
 
-      const printerName = getPrinterName();
-
-      await printLabelPallet(
-        palletNumber,
-        task.piecesPerPallet,
-        printer,
-        task,
-        this.logger,
-        productsInPallet,
-        printerName,
+      await this.printerTransportService.sendFile(
+        getPrinterName(),
+        data,
+        `паллеты ${palletNumber}`,
       );
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Ошибка печати этикетки паллеты:', err);
+      if (err instanceof HttpException) {
+        throw err;
+      }
     }
   }
   public getConnectionStatus(): boolean {

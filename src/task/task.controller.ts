@@ -59,7 +59,7 @@ export class TaskController {
   async createTask(@Body() body: any) {
     const { nomenclatureId, numberValue, ...data } = body;
 
-    return await this.taskService.createTask(data, nomenclatureId, numberValue);
+    return await this.taskService.createTask(data, nomenclatureId);
   }
 
   @Delete(':id')

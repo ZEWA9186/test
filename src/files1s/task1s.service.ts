@@ -145,7 +145,15 @@ export class Task1sService implements OnModuleInit {
       }
 
       try {
-        const rawCodes: string[] = codes && codes.length > 0 ? codes : jsonParsed.codes;
+        const rawCodes = codes ?? jsonParsed.codes;
+
+        if (!Array.isArray(rawCodes) || rawCodes.length === 0) {
+          return {
+            success: false,
+            errors: ['Нет валидных кодов для сохранения задания'],
+            items: ['codes'],
+          };
+        }
 
         const mappedData = { ...jsonParsed, codes: rawCodes.map((codeStr) => ({ code: codeStr })) };
         const taskEntity = this.taskRepository.create(mappedData);

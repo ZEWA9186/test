@@ -52,12 +52,16 @@ export class TaskService {
     });
   }
 
-  async getCodesByTaskId(taskId: number): Promise<string[]> {
+  async getCodesToPrintByTaskId(taskId: number): Promise<any[]> {
     const codes = await this.taskCodesRepository.find({
       where: { taskId },
     });
 
-    return codes.map((code) => code.code);
+    return codes.map((code) => ({
+      id: code.id,
+      date: `${code.createdAt.getMonth() + 1}.${code.createdAt.getFullYear()}`,
+      code: code.code,
+    }));
   }
 
   async createTask(data: any, nomenclatureId: number, numberValue?: number): Promise<TaskEntity> {

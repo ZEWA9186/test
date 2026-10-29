@@ -9,11 +9,17 @@ import {
   Post,
 } from '@nestjs/common';
 
-import { AggregationService } from './aggregation.service';
+import { AggregationService } from './service/aggregation.service';
+import { AggregationManualService } from './service/aggregation-manual.service';
+import { AggregationReportService } from './service/aggregation-report.service';
 
 @Controller('aggregation')
 export class AggregationController {
-  constructor(private readonly aggregationService: AggregationService) {}
+  constructor(
+    private readonly aggregationService: AggregationService,
+    private readonly aggregationManualService: AggregationManualService,
+    private readonly aggregationReportService: AggregationReportService,
+  ) {}
 
   // Обычная фасовка
 
@@ -23,22 +29,18 @@ export class AggregationController {
     return this.aggregationService.processScan(tsdId, body.code);
   }
 
-  @Post(':id/add-product-into-package')
+  @Get(':id/get-current-state')
   @HttpCode(HttpStatus.OK)
-  async addProductIntoPackage(
-    @Param('id', ParseIntPipe) tsdId: number,
-    @Body() body: { packageLabel: string; code: string },
-  ) {
-    return this.aggregationService.addProductIntoPackage(body.packageLabel, tsdId, body.code);
+  async getCurrentState(@Param('id', ParseIntPipe) tsdId: number) {
+    return await this.aggregationService.getCurrentState(tsdId);
   }
 
-  @Post(':id/search-product')
+  // РУЧНЫЕ ОПЕРАЦИИ
+
+  @Post(':id/delete-code')
   @HttpCode(HttpStatus.OK)
-  async searchProductInfo(
-    @Param('id', ParseIntPipe) tsdId: number,
-    @Body() body: { code: string },
-  ) {
-    return this.aggregationService.searchInfo(tsdId, body.code);
+  async deleteCode(@Param('id', ParseIntPipe) tsdId: number, @Body() body: { code: string }) {
+    await this.aggregationManualService.deleteCode(tsdId, body.code);
   }
 
   @Post(':id/delete-package')
@@ -47,7 +49,7 @@ export class AggregationController {
     @Param('id', ParseIntPipe) tsdId: number,
     @Body() body: { packageLabel: string },
   ) {
-    await this.aggregationService.deletePackage(tsdId, body.packageLabel);
+    await this.aggregationManualService.deletePackage(tsdId, body.packageLabel);
   }
 
   @Post(':id/move-box')
@@ -56,25 +58,33 @@ export class AggregationController {
     @Param('id', ParseIntPipe) tsdId: number,
     @Body() body: { innerLabel: string; outerLabel: string },
   ) {
-    await this.aggregationService.moveBox(body.innerLabel, body.outerLabel, tsdId);
+    await this.aggregationManualService.moveBox(body.innerLabel, body.outerLabel, tsdId);
   }
 
-  @Post(':id/delete-code')
+  @Post(':id/add-product-into-package')
   @HttpCode(HttpStatus.OK)
-  async deleteCode(@Param('id', ParseIntPipe) tsdId: number, @Body() body: { code: string }) {
-    await this.aggregationService.deleteCode(tsdId, body.code);
+  async addProductIntoPackage(
+    @Param('id', ParseIntPipe) tsdId: number,
+    @Body() body: { packageLabel: string; code: string },
+  ) {
+    return this.aggregationManualService.addProductIntoPackage(body.packageLabel, tsdId, body.code);
+  }
+
+  // ИНФОРМАЦИЯ И ПОИСК
+
+  @Post(':id/search-product')
+  @HttpCode(HttpStatus.OK)
+  async searchProductInfo(
+    @Param('id', ParseIntPipe) tsdId: number,
+    @Body() body: { code: string },
+  ) {
+    return this.aggregationReportService.searchInfo(tsdId, body.code);
   }
 
   @Get(':id/getStats')
   @HttpCode(HttpStatus.OK)
   async getStats(@Param('id', ParseIntPipe) tsdId: number) {
-    return await this.aggregationService.validateTaskCompletion(tsdId);
-  }
-
-  @Get(':id/get-current-state')
-  @HttpCode(HttpStatus.OK)
-  async getCurrentState(@Param('id', ParseIntPipe) tsdId: number) {
-    return await this.aggregationService.getCurrentState(tsdId);
+    return await this.aggregationReportService.validateTaskCompletion(tsdId);
   }
 
   @Get()

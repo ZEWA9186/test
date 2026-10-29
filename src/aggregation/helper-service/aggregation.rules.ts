@@ -144,14 +144,10 @@ export class AggregationRules {
         return ExpectedScanType.PRODUCT;
 
       case ExpectedScanType.BIG_BOX_LABEL:
-        return aggregationLvl === 3
-          ? ExpectedScanType.SMALL_BOX_LABEL
-          : ExpectedScanType.PRODUCT;
+        return aggregationLvl === 3 ? ExpectedScanType.SMALL_BOX_LABEL : ExpectedScanType.PRODUCT;
 
       case ExpectedScanType.PALLET_LABEL:
-        return aggregationLvl === 1
-          ? ExpectedScanType.PRODUCT
-          : ExpectedScanType.BIG_BOX_LABEL;
+        return aggregationLvl === 1 ? ExpectedScanType.PRODUCT : ExpectedScanType.BIG_BOX_LABEL;
 
       default:
         return null;

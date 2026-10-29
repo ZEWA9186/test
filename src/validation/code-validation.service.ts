@@ -56,10 +56,7 @@ export class CodeValidationService {
     return { errors, items };
   }
 
-  async cleanAndFilterCodes(
-    codes: string[],
-    gtin: string,
-  ): Promise<TaskValidationResult> {
+  async cleanAndFilterCodes(codes: string[], gtin: string): Promise<TaskValidationResult> {
     // 1. Прогоняем через те же базовые проверки
     const baseCheck = await this.defaultCheck(codes, gtin);
     if (baseCheck.errors.length > 0) {
@@ -70,10 +67,9 @@ export class CodeValidationService {
 
     // 2. Тянем данные из первой базы (через сервис)
     const codesFromFirstBase: string[] = (
-      await this.dataSource.query(
-        'SELECT code FROM "code_entity" WHERE code = ANY($1)',
-        [uniqueCodes],
-      )
+      await this.dataSource.query('SELECT code FROM "code_entity" WHERE code = ANY($1)', [
+        uniqueCodes,
+      ])
     ).map((code: CodeEntity) => code.code);
 
     // 3. Тянем данные из второй базы (из task_codes)
@@ -97,10 +93,7 @@ export class CodeValidationService {
     };
   }
 
-  private async defaultCheck(
-    codes: string[],
-    gtin: string,
-  ): Promise<TaskValidationResult> {
+  private async defaultCheck(codes: string[], gtin: string): Promise<TaskValidationResult> {
     const items: string[] = [];
     const errors: string[] = [];
 
@@ -111,12 +104,8 @@ export class CodeValidationService {
     }
 
     const expectedPrefix = `01${gtin}`;
-    if (
-      codes.some((c) => typeof c !== 'string' || !c.startsWith(expectedPrefix))
-    ) {
-      errors.push(
-        'Коды маркировки содержат значения, не соответствующие GTIN задания',
-      );
+    if (codes.some((c) => typeof c !== 'string' || !c.startsWith(expectedPrefix))) {
+      errors.push('Коды маркировки содержат значения, не соответствующие GTIN задания');
       items.push('codes');
       return { errors, items };
     }

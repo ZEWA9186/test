@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { configLogger } from '../logger-winston/winston.config';
+import { initDirectories } from './config.paths';
 
 interface ConfigDefinition {
   key: string;
@@ -278,5 +279,9 @@ export class ConfigValidationService {
     }
 
     configLogger.info(`Конфигурация проверена. Отчёт: ${reportPath}`);
+  }
+
+  async initDirectories(): Promise<void> {
+    await initDirectories();
   }
 }

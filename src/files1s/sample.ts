@@ -14,6 +14,7 @@ export const TASK: IDefaultTask[] = [
     comment: 'название отображаемое в окне программы для оператора',
     required: true,
   },
+
   {
     name: 'description',
     label: 'Описание продукта',
@@ -21,19 +22,19 @@ export const TASK: IDefaultTask[] = [
     allowSpace: true,
   },
   {
-    name: 'smallBoxLable',
+    name: 'smallBoxLabel',
     label: 'Название шаблона этикетки малого короба',
     comment: 'Название шаблона этикетки малого короба.',
-    required: true,
+    required: false,
   },
   {
-    name: 'bigBoxLable',
+    name: 'bigBoxLabel',
     label: 'Название шаблона этикетки большого короба',
     comment: 'Название шаблона этикетки большого короба.',
     required: true,
   },
   {
-    name: 'palletLable',
+    name: 'palletLabel',
     label: 'Название шаблона этикетки паллеты',
     comment: 'Название шаблона этикетки паллеты.',
     required: true,
@@ -65,6 +66,16 @@ export const TASK: IDefaultTask[] = [
     required: true,
   },
   {
+    name: 'docId',
+    label: 'Идентификатор документа 1С',
+    comment: 'Идентификатор документа, который присылает 1С',
+    required: true,
+  },
+  { name: 'ITF14', label: 'ITF-14', comment: 'ITF-14', required: true },
+  { name: 'EAN13', label: 'EAN-13', comment: 'EAN-13', required: true },
+  { name: 'bruttoBox', label: 'Брутто короба', comment: 'Вес брутто короба', required: true },
+  { name: 'packer', label: 'Упаковщик', comment: 'Упаковщик', allowSpace: true },
+  {
     name: 'dateExpiration',
     label: 'Дата окончания срока годности',
     comment: '',
@@ -74,7 +85,7 @@ export const TASK: IDefaultTask[] = [
     name: 'piecesPerSmallBox',
     label: 'Количество продуктов в малой коробе',
     comment: '',
-    required: true,
+    required: false,
   },
   {
     name: 'piecesPerBigBox',

@@ -1,229 +1,142 @@
-/* eslint-disable prettier/prettier */
-import { Logger } from 'winston';
-// import { Status } from 'src/globalTypes';
-import * as fs from 'fs';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import * as iconv from 'iconv-lite';
+
 import { getTemplateDirectory } from '../config/config.paths';
-import { exec } from 'child_process';
 import { getBoxNetto, getBoxNettoKG, getNettoUnitKG, generateLabel } from './helper';
-import { promisify } from 'util';
-import * as dotenv from 'dotenv';
 import { EncodingType } from './types';
-import { getPcName, getPrinterDecodeType, getPrinterEncodeType } from '../config/config.env';
-import { TaskEntity } from '../task/entities/task.entity';
-dotenv.config();
-const execAsync = promisify(exec);
+import type { TaskEntity } from '../task/entities/task.entity';
 
-// let globalPrinterStatus = Status.Connected;
-const printer1DecodeType = getPrinterDecodeType();
-const printer1EncodeType = getPrinterEncodeType();
+const PRINT_ENCODING = EncodingType.WIN1251;
+const PRINT_DECODING = EncodingType.WIN1251;
+//Информация для общих реплесментов + частные отдельно
+interface LabelBuildOptions {
+  templateName: string | null;
+  packageCode: string;
+  number: number;
+  description: string;
+  replacements: Record<string, string>;
+}
 
-export async function printLabelBox(
+function applyTemplate(template: string, values: Record<string, string>): string {
+  return Object.entries(values).reduce(
+    (result, [placeholder, value]) => result.replaceAll(placeholder, value),
+    template,
+  );
+}
+
+async function readTemplate(templateName: string): Promise<string> {
+  const templatePath = path.join(getTemplateDirectory(), `${templateName}.prn`);
+  const data = await fs.readFile(templatePath);
+
+  return iconv.decode(data, PRINT_DECODING);
+}
+
+async function buildLabelFile(options: LabelBuildOptions): Promise<Buffer> {
+  const { templateName, packageCode, number, description, replacements } = options;
+
+  if (!templateName) {
+    throw new Error(`Не задана этикетка для ${description}`);
+  }
+
+  const template = await readTemplate(templateName);
+  const sscc = generateLabel(packageCode, `${number}`);
+  //общие реплесменты
+  const rendered = applyTemplate(template, {
+    '<gs1128_dis>': `(00)${sscc.slice(2)}`,
+    '<gs1128_dm>': sscc,
+    //номер упаковки
+    '<nnn_pallet>': `${number}`,
+    ...replacements,
+  });
+
+  return iconv.encode(rendered, PRINT_ENCODING);
+}
+
+export async function buildSmallBoxLabelFile(
   boxNumber: number,
   countInBox: number,
-  printer: any,
   task: TaskEntity,
-  logger: Logger,
-  printerName: any,
-) {
-  const PCName = getPcName();
-  console.log('===============printerName', printerName);
-  if (!printer) {
-    logger.warn('Принтер: Принтер не подключен');
-    return;
-  }
-  logger.warn(`Печать этикетки для коробки ${boxNumber}`);
-  if (!task.smallBoxLabel) {
-    logger.warn('Принтер: Не задана этикетка коробки');
-    return;
-  }
-  try {
-    printer.clear();
-    const encoding = EncodingType.WIN1251;
-    const decoding = EncodingType.WIN1251;
-    console.log('--------encoding,decoding ----box', encoding, decoding, printerName);
-    const label = task.smallBoxLabel;
-    const data = await fs.promises.readFile(`${getTemplateDirectory()}/${label}.prn`);
-    const decodedData = iconv.decode(data, decoding);
-    let modifiedData = decodedData;
-
-    const sscc = generateLabel('8', `${boxNumber}`);
-    const ssccDis = `(00)` + sscc.slice(2);
-
-    modifiedData = modifiedData
-      .replace('<gs1128_dis>', `${ssccDis}`)
-      .replace('<nnn_pallet>', `${boxNumber}`)
-      .replace('<nnn_pieces_per_package>', `${countInBox}`)
-      .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
-      .replace('<nnn_netto_box_kg>', `${getBoxNettoKG(task.nettoUnit, countInBox)}`)
-      .replace('<nnn_netto_unit_kg>', `${getNettoUnitKG(task.nettoUnit)}`)
-      .replace('<gs1128_dm>', sscc);
-    console.log('----------=', modifiedData);
-
-    const encodedData = iconv.encode(modifiedData, encoding);
-    const newFileName = `${getTemplateDirectory()}\\${Date.now()}.prn`.replace(/\//g, '\\');
-
-    await fs.promises.writeFile(newFileName, encodedData);
-    const command = `COPY /B ${newFileName} \\\\${PCName}\\${printerName}`;
-    // console.log(command);
-    const { stderr } = await execAsync(command);
-    if (stderr) {
-      logger.error('Ошибка отправки файла на печать:', stderr);
-      return;
-    }
-    setTimeout(async () => {
-      try {
-        await fs.promises.unlink(newFileName);
-        logger.info('Файл успешно удален');
-      } catch (unlinkErr) {
-        logger.error('Ошибка удаления файла:', unlinkErr);
-      }
-    }, 500);
-    logger.info('Принтер: Печать коробки завершена');
-  } catch (err) {
-    logger.error('Принтер: Ошибка печати', err);
-  }
+): Promise<Buffer> {
+  return buildLabelFile({
+    templateName: task.smallBoxLabel,
+    packageCode: '7',
+    number: boxNumber,
+    description: `малой коробки ${boxNumber}`,
+    replacements: {
+      '<nnn_pieces_per_package>': `${countInBox}`,
+      '<nnn_netto_box>': `${getBoxNetto(task.nettoUnit, countInBox)}`,
+      '<nnn_netto_box_kg>': `${getBoxNettoKG(task.nettoUnit, countInBox)}`,
+      '<nnn_netto_unit_kg>': `${getNettoUnitKG(task.nettoUnit)}`,
+    },
+  });
 }
 
-export async function printLabelSmallBox(
+export async function buildBigBoxLabelFile(
   boxNumber: number,
   countInBox: number,
-  printer: any,
-  task: any,
-  logger: Logger,
-  printerName: any,
-) {
-  const PCName = getPcName();
-  console.log('===============printerName', printerName);
-
-  if (!printer) {
-    logger.warn('Принтер: Принтер не подключен');
-    return;
-  }
-  logger.warn(`Печать этикетки для коробки ${boxNumber}`);
-  if (!task.smallBoxLabel) {
-    logger.warn('Принтер: Не задана этикетка коробки');
-    return;
-  }
-  try {
-    printer.clear();
-    const encoding = EncodingType.WIN1251;
-    const decoding = EncodingType.WIN1251;
-    console.log('--------encoding,decoding ----box', encoding, decoding, printerName);
-    const label = task.smallBoxLabel;
-    const data = await fs.promises.readFile(`${getTemplateDirectory()}/${label}.prn`);
-    const decodedData = iconv.decode(data, decoding);
-    let modifiedData = decodedData;
-
-    const sscc = generateLabel('7', `${boxNumber}`);
-    const ssccDis = `(00)` + sscc.slice(2);
-
-    modifiedData = modifiedData
-      .replace('<gs1128_dis>', `${ssccDis}`)
-      .replace('<nnn_pallet>', `${boxNumber}`)
-      .replace('<nnn_pieces_per_package>', `${countInBox}`)
-      .replace('<nnn_netto_box>', `${getBoxNetto(task.nettoUnit, countInBox)}`)
-      .replace('<nnn_netto_box_kg>', `${getBoxNettoKG(task.nettoUnit, countInBox)}`)
-      .replace('<nnn_netto_unit_kg>', `${getNettoUnitKG(task.nettoUnit)}`)
-      .replace('<gs1128_dm>', sscc);
-    console.log('----------=', modifiedData);
-
-    const encodedData = iconv.encode(modifiedData, encoding);
-    const newFileName = `${getTemplateDirectory()}\\${Date.now()}.prn`.replace(/\//g, '\\');
-
-    await fs.promises.writeFile(newFileName, encodedData);
-    const command = `COPY /B ${newFileName} \\\\${PCName}\\${printerName}`;
-    // console.log(command);
-    const { stderr } = await execAsync(command);
-    if (stderr) {
-      logger.error('Ошибка отправки файла на печать:', stderr);
-      return;
-    }
-    setTimeout(async () => {
-      try {
-        await fs.promises.unlink(newFileName);
-        logger.info('Файл успешно удален');
-      } catch (unlinkErr) {
-        logger.error('Ошибка удаления файла:', unlinkErr);
-      }
-    }, 500);
-    logger.info('Принтер: Печать коробки завершена');
-  } catch (err) {
-    logger.error('Принтер: Ошибка печати', err);
-  }
+  task: TaskEntity,
+): Promise<Buffer> {
+  return buildLabelFile({
+    templateName: task.bigBoxLabel,
+    packageCode: '8',
+    number: boxNumber,
+    description: `большой коробки ${boxNumber}`,
+    replacements: {
+      '<nnn_pieces_per_package>': `${countInBox}`,
+      '<nnn_netto_box>': `${getBoxNetto(task.nettoUnit, countInBox)}`,
+      '<nnn_netto_box_kg>': `${getBoxNettoKG(task.nettoUnit, countInBox)}`,
+      '<nnn_netto_unit_kg>': `${getNettoUnitKG(task.nettoUnit)}`,
+    },
+  });
 }
 
-export async function printLabelPallet(
+export async function buildPalletLabelFile(
   palletNumber: number,
-  countInPallet: number,
-  printer: any,
-  task: any,
-  logger: Logger,
-  itemsPerPallet: any,
-  printerName: any,
-) {
-  const PCName = getPcName();
-  if (!printer) {
-    logger.warn('Принтер: Принтер не подключен');
-    return;
-  }
-  console.log(task);
-  if (!task.palletLabel) {
-    logger.warn('Принтер: Не задана этикетка паллеты');
-    return;
-  }
-  try {
-    logger.warn(`Печать этикетки для паллеты ${palletNumber}`);
-    printer.clear();
-    const encoding = EncodingType.WIN1251;
-    const decoding = EncodingType.WIN1251;
-    console.log('--------encoding,decoding ----pallet', encoding, decoding, printerName);
+  task: TaskEntity,
+  itemsPerPallet: number | null,
+): Promise<Buffer> {
+  return buildLabelFile({
+    templateName: task.palletLabel,
+    packageCode: '9',
+    number: palletNumber,
+    description: `паллеты ${palletNumber}`,
+    replacements: {
+      '<nnn_items_per_pallet>': itemsPerPallet ? `${itemsPerPallet}` : '',
+    },
+  });
+}
 
-    fs.readFile(`${getTemplateDirectory()}/${task.palletLabel}.prn`, (err, data) => {
-      if (err) {
-        logger.error('Ошибка чтения файла паллеты:', err);
-        return;
-      }
-      const decodedData = iconv.decode(data, decoding);
-      let modifiedData = decodedData;
+function sanitizeDmCode(codeData: string): string {
+  return codeData.replaceAll('\u001d', '@').replaceAll('@', '$d029');
+}
 
-      // Заменяем <nnn_items_per_pallet> на значение или пробел, если не указано
-      const itemsPerPalletValue = itemsPerPallet ? `${itemsPerPallet}` : '';
+function buildCommandsFromTemplate(template: string, code: string): string[] {
+  return applyTemplate(template, { '<GS1>': `$1${code}` })
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
 
-      const sscc = generateLabel('9', `${palletNumber}`);
-      const ssccDis = `(00)` + sscc.slice(2);
+export async function buildDmCodeCommands(codeData: string): Promise<string[]> {
+  const template = await fs.readFile(path.join(getTemplateDirectory(), 'template.prn'), 'utf-8');
 
-      modifiedData = modifiedData
-        .replace('<nnn_pallet>', `${palletNumber}`)
-        .replace('<nnn_items_per_pallet>', itemsPerPalletValue) // Используем подготовленное значение
-        .replace('<gs1128_dis>', `${ssccDis}`)
-        .replace('<gs1128_dm>', sscc);
-      const encodedData = iconv.encode(modifiedData, encoding);
-      const newFileName = `${getTemplateDirectory()}\\${Date.now()}.prn`.replace(/\//g, '\\');
-      fs.writeFile(newFileName, encodedData, (writeErr) => {
-        if (writeErr) {
-          logger.error('Ошибка записи файла:', writeErr);
-          return;
-        }
-        const command = `COPY /B ${newFileName} \\\\${PCName}\\${printerName}`;
-        exec(command, (execErr) => {
-          if (execErr) {
-            logger.error('Ошибка отправки файла на печать:', execErr);
-            return;
-          }
-          setTimeout(async () => {
-            try {
-              await fs.promises.unlink(newFileName);
-              logger.info('Файл успешно удален');
-            } catch (unlinkErr) {
-              logger.error('Ошибка удаления файла:', unlinkErr);
-            }
-          }, 500);
-          logger.info('Принтер: Печать паллеты завершена');
-        });
-      });
-    });
-  } catch (err) {
-    logger.error('Принтер: Ошибка печати:', err);
-  }
+  return buildCommandsFromTemplate(template, sanitizeDmCode(codeData));
+}
+
+export async function buildDmBigCodeCommands(codeData: string): Promise<string[]> {
+  const template = await fs.readFile(path.join(getTemplateDirectory(), 'templateBig.prn'), 'utf-8');
+
+  return buildCommandsFromTemplate(template, sanitizeDmCode(codeData));
+}
+
+export function buildDmEmptyLabelCommands(): string[] {
+  return [
+    'SIZE 18.7 mm, 20.1 mm',
+    'GAP 3 mm, 0 mm',
+    'DIRECTION 0,0',
+    'REFERENCE 0,0',
+    'CLS',
+    'PRINT 1,1',
+  ];
 }
