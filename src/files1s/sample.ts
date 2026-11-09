@@ -25,13 +25,11 @@ export const TASK: IDefaultTask[] = [
     name: 'smallBoxLabel',
     label: 'Название шаблона этикетки малого короба',
     comment: 'Название шаблона этикетки малого короба.',
-    required: false,
   },
   {
     name: 'bigBoxLabel',
     label: 'Название шаблона этикетки большого короба',
     comment: 'Название шаблона этикетки большого короба.',
-    required: true,
   },
   {
     name: 'palletLabel',

@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { InjectRepository } from '@nestjs/typeorm';
+import { EntityManager } from 'typeorm';
 
 import { ActiveTaskEntity, ExpectedScanType } from '../entities/active-task.entity';
 import { AggregationRepository } from '../repository/aggregation.repository';
@@ -18,76 +17,76 @@ export class AggregationReportService {
     private readonly shared: AggregationSharedService,
     private readonly aggregationRepository: AggregationRepository,
     private readonly gs1Parser: Gs1ParserService,
-    @InjectRepository(TaskCodesEntity)
-    private readonly taskCodesRepository: Repository<TaskCodesEntity>,
   ) {}
 
   async searchInfo(tsdId: number, code: string): Promise<AggregationInfoDto> {
     return withOperationLogging({ tsdId, operation: 'searchInfo', code }, async (context) => {
-      const activeTask = await this.shared.getActiveTask(tsdId);
-      context.taskId = activeTask.taskId;
+      return this.shared.withReadTransaction(tsdId, async (manager, activeTask) => {
+        context.taskId = activeTask.taskId;
 
-      const scanType = this.gs1Parser.getScanType(code, activeTask);
+        const scanType = this.gs1Parser.getScanType(code, activeTask);
 
-      switch (scanType) {
-        case ExpectedScanType.PRODUCT:
-          return this.searchProductInfo(code, activeTask, scanType);
+        switch (scanType) {
+          case ExpectedScanType.PRODUCT:
+            return this.searchProductInfo(code, activeTask, scanType, manager);
 
-        case ExpectedScanType.SMALL_BOX_LABEL:
-        case ExpectedScanType.BIG_BOX_LABEL:
-        case ExpectedScanType.PALLET_LABEL:
-          return this.searchPackageInfo(code, activeTask, scanType);
+          case ExpectedScanType.SMALL_BOX_LABEL:
+          case ExpectedScanType.BIG_BOX_LABEL:
+          case ExpectedScanType.PALLET_LABEL:
+            return this.searchPackageInfo(code, activeTask, scanType, manager);
 
-        default:
-          throw new BadRequestException('Не удалось определить тип этикетки');
-      }
+          default:
+            throw new BadRequestException('Не удалось определить тип этикетки');
+        }
+      });
     });
   }
 
   async validateTaskCompletion(tsdId: number) {
     return withOperationLogging({ tsdId, operation: 'validateTaskCompletion' }, async (context) => {
-      const activeTask = await this.shared.getActiveTask(tsdId);
-      context.taskId = activeTask.taskId;
+      return this.shared.withReadTransaction(tsdId, async (manager, activeTask) => {
+        context.taskId = activeTask.taskId;
 
-      const stats = await this.aggregationRepository.getTaskPackagingStats(activeTask);
+        const stats = await this.aggregationRepository.getTaskPackagingStats(activeTask, manager);
 
-      const formatCode = (code: string): string => {
-        const scanType = this.gs1Parser.getScanType(code, activeTask);
+        const formatCode = (code: string): string => {
+          const scanType = this.gs1Parser.getScanType(code, activeTask);
 
-        return scanType === ExpectedScanType.PRODUCT
-          ? code
-          : this.gs1Parser.getContainerNumber(code);
-      };
+          return scanType === ExpectedScanType.PRODUCT
+            ? code
+            : this.gs1Parser.getContainerNumber(code);
+        };
 
-      const formatContainers = (containers: ContainerFillStats[]) =>
-        containers.map((container) => ({
-          ...container,
-          label: formatCode(container.label),
-          contents: container.contents.map(formatCode),
-        }));
+        const formatContainers = (containers: ContainerFillStats[]) =>
+          containers.map((container) => ({
+            ...container,
+            label: formatCode(container.label),
+            contents: container.contents.map(formatCode),
+          }));
 
-      if (activeTask.taskId === null) {
-        throw new InternalServerErrorException();
-      }
+        if (activeTask.taskId === null) {
+          throw new InternalServerErrorException();
+        }
 
-      const taskCodesCount = await this.taskCodesRepository.count({
-        where: { taskId: activeTask.taskId },
+        const taskCodesCount = await manager.getRepository(TaskCodesEntity).count({
+          where: { taskId: activeTask.taskId },
+        });
+
+        if (stats.totalRecords !== taskCodesCount) {
+          stats.isValid = false;
+        }
+
+        return {
+          ...stats,
+          requiredRecords: taskCodesCount,
+          productsWithoutPackaging: stats.productsWithoutPackaging.map(formatCode),
+          smallBoxesWithoutBigBox: stats.smallBoxesWithoutBigBox.map(formatCode),
+          bigBoxesWithoutPallet: stats.bigBoxesWithoutPallet.map(formatCode),
+          smallBoxes: formatContainers(stats.smallBoxes),
+          bigBoxes: formatContainers(stats.bigBoxes),
+          pallets: formatContainers(stats.pallets),
+        };
       });
-
-      if (stats.totalRecords !== taskCodesCount) {
-        stats.isValid = false;
-      }
-
-      return {
-        ...stats,
-        requiredRecords: taskCodesCount,
-        productsWithoutPackaging: stats.productsWithoutPackaging.map(formatCode),
-        smallBoxesWithoutBigBox: stats.smallBoxesWithoutBigBox.map(formatCode),
-        bigBoxesWithoutPallet: stats.bigBoxesWithoutPallet.map(formatCode),
-        smallBoxes: formatContainers(stats.smallBoxes),
-        bigBoxes: formatContainers(stats.bigBoxes),
-        pallets: formatContainers(stats.pallets),
-      };
     });
   }
 
@@ -95,8 +94,9 @@ export class AggregationReportService {
     code: string,
     activeTask: ActiveTaskEntity,
     scanType: ExpectedScanType,
+    manager: EntityManager,
   ): Promise<AggregationInfoDto> {
-    const product = await this.aggregationRepository.searchProductInfo(activeTask, code);
+    const product = await this.aggregationRepository.searchProductInfo(activeTask, code, manager);
 
     return {
       scanType,
@@ -116,17 +116,20 @@ export class AggregationReportService {
     packageLabel: string,
     activeTask: ActiveTaskEntity,
     scanType: ExpectedScanType,
+    manager: EntityManager,
   ): Promise<AggregationInfoDto> {
     const packaging = await this.aggregationRepository.searchPackageInfo(
       activeTask,
       packageLabel,
       scanType,
+      manager,
     );
 
     const contentsCount = await this.aggregationRepository.countPackageContents(
       activeTask,
       packageLabel,
       scanType,
+      manager,
     );
 
     const parents: AggregationInfoDto['parents'] = {

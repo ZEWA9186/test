@@ -59,7 +59,7 @@ export class TaskService {
 
     return codes.map((code) => ({
       id: code.id,
-      date: `${code.createdAt.getMonth() + 1}.${code.createdAt.getFullYear()}`,
+      date: `${String(code.createdAt.getMonth() + 1).padStart(2, '0')}.${code.createdAt.getFullYear()}`,
       code: code.code,
     }));
   }

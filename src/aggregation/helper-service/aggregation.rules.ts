@@ -154,6 +154,19 @@ export class AggregationRules {
     }
   }
 
+  static getOuterType(scanType: ExpectedScanType): ExpectedScanType | null {
+    switch (scanType) {
+      case ExpectedScanType.SMALL_BOX_LABEL:
+        return ExpectedScanType.BIG_BOX_LABEL;
+
+      case ExpectedScanType.BIG_BOX_LABEL:
+        return ExpectedScanType.PALLET_LABEL;
+
+      default:
+        return null;
+    }
+  }
+
   static getExpectedScan(
     activeTask: ActiveTaskEntity,
     counts: AggregationCounts,

@@ -1,21 +1,53 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as iconv from 'iconv-lite';
+import { GS1Parser } from '@valentynb/gs1-parser';
 
 import { getTemplateDirectory } from '../config/config.paths';
-import { getBoxNetto, getBoxNettoKG, getNettoUnitKG, generateLabel } from './helper';
+import { generateLabel } from './helper';
 import { EncodingType } from './types';
 import type { TaskEntity } from '../task/entities/task.entity';
 
+const gs1Parser = new GS1Parser();
+
+export interface DmPrintCode {
+  code: string;
+  date: string;
+  id?: number;
+}
+
 const PRINT_ENCODING = EncodingType.WIN1251;
 const PRINT_DECODING = EncodingType.WIN1251;
-//Информация для общих реплесментов + частные отдельно
 interface LabelBuildOptions {
   templateName: string | null;
   packageCode: string;
   number: number;
   description: string;
-  replacements: Record<string, string>;
+  date?: string;
+  batch?: string;
+}
+
+interface CommonReplacementsInput {
+  sscc?: string;
+  gs1?: string;
+  gs1Dis?: string;
+  date?: string;
+  batch?: string;
+}
+//Заглушка
+const NUMBER_PLACEHOLDER = '001';
+
+/** Единый набор плейсхолдеров для всех типов этикеток. */
+function buildCommonReplacements(values: CommonReplacementsInput): Record<string, string> {
+  return {
+    '<SSCC>': values.sscc ?? '',
+    '<SSCC_dis>': values.sscc ? `(00)${values.sscc.slice(2)}` : '',
+    '<GS1>': values.gs1 ?? '',
+    '<GS1_dis>': values.gs1Dis ?? '',
+    '<DATE>': values.date ?? '',
+    '<PARTY>': values.batch ?? '',
+    '<NUMBER>': NUMBER_PLACEHOLDER,
+  };
 }
 
 function applyTemplate(template: string, values: Record<string, string>): string {
@@ -33,7 +65,7 @@ async function readTemplate(templateName: string): Promise<string> {
 }
 
 async function buildLabelFile(options: LabelBuildOptions): Promise<Buffer> {
-  const { templateName, packageCode, number, description, replacements } = options;
+  const { templateName, packageCode, number, description, date, batch } = options;
 
   if (!templateName) {
     throw new Error(`Не задана этикетка для ${description}`);
@@ -41,69 +73,44 @@ async function buildLabelFile(options: LabelBuildOptions): Promise<Buffer> {
 
   const template = await readTemplate(templateName);
   const sscc = generateLabel(packageCode, `${number}`);
-  //общие реплесменты
-  const rendered = applyTemplate(template, {
-    '<gs1128_dis>': `(00)${sscc.slice(2)}`,
-    '<gs1128_dm>': sscc,
-    //номер упаковки
-    '<nnn_pallet>': `${number}`,
-    ...replacements,
-  });
+  const rendered = applyTemplate(template, buildCommonReplacements({ sscc, date, batch }));
 
   return iconv.encode(rendered, PRINT_ENCODING);
 }
 
-export async function buildSmallBoxLabelFile(
-  boxNumber: number,
-  countInBox: number,
-  task: TaskEntity,
-): Promise<Buffer> {
+export async function buildSmallBoxLabelFile(boxNumber: number, task: TaskEntity): Promise<Buffer> {
   return buildLabelFile({
     templateName: task.smallBoxLabel,
     packageCode: '7',
     number: boxNumber,
     description: `малой коробки ${boxNumber}`,
-    replacements: {
-      '<nnn_pieces_per_package>': `${countInBox}`,
-      '<nnn_netto_box>': `${getBoxNetto(task.nettoUnit, countInBox)}`,
-      '<nnn_netto_box_kg>': `${getBoxNettoKG(task.nettoUnit, countInBox)}`,
-      '<nnn_netto_unit_kg>': `${getNettoUnitKG(task.nettoUnit)}`,
-    },
+    date: task.dateManufacture.slice(3),
+    batch: task.batch,
   });
 }
 
-export async function buildBigBoxLabelFile(
-  boxNumber: number,
-  countInBox: number,
-  task: TaskEntity,
-): Promise<Buffer> {
+export async function buildBigBoxLabelFile(boxNumber: number, task: TaskEntity): Promise<Buffer> {
   return buildLabelFile({
     templateName: task.bigBoxLabel,
     packageCode: '8',
     number: boxNumber,
     description: `большой коробки ${boxNumber}`,
-    replacements: {
-      '<nnn_pieces_per_package>': `${countInBox}`,
-      '<nnn_netto_box>': `${getBoxNetto(task.nettoUnit, countInBox)}`,
-      '<nnn_netto_box_kg>': `${getBoxNettoKG(task.nettoUnit, countInBox)}`,
-      '<nnn_netto_unit_kg>': `${getNettoUnitKG(task.nettoUnit)}`,
-    },
+    date: task.dateManufacture.slice(3),
+    batch: task.batch,
   });
 }
 
 export async function buildPalletLabelFile(
   palletNumber: number,
   task: TaskEntity,
-  itemsPerPallet: number | null,
 ): Promise<Buffer> {
   return buildLabelFile({
     templateName: task.palletLabel,
     packageCode: '9',
     number: palletNumber,
     description: `паллеты ${palletNumber}`,
-    replacements: {
-      '<nnn_items_per_pallet>': itemsPerPallet ? `${itemsPerPallet}` : '',
-    },
+    date: task.dateManufacture.slice(3),
+    batch: task.batch,
   });
 }
 
@@ -111,23 +118,46 @@ function sanitizeDmCode(codeData: string): string {
   return codeData.replaceAll('\u001d', '@').replaceAll('@', '$d029');
 }
 
-function buildCommandsFromTemplate(template: string, code: string): string[] {
-  return applyTemplate(template, { '<GS1>': `$1${code}` })
+function formatDmHumanReadable(code: string): string {
+  try {
+    const humanReadable = gs1Parser.decode(code).denormalized || code;
+
+    // ^FB в ZPL переносит строку по пробелам. Добавляем пробел
+    // каждые 11 символов, чтобы переносы были предсказуемыми.
+    return humanReadable.replace(/(.{11})(?=.)/g, '$1 ');
+  } catch {
+    return code.replace(/(.{11})(?=.)/g, '$1 ');
+  }
+}
+
+function buildCommandsFromTemplate(
+  template: string,
+  replacements: Record<string, string>,
+): string[] {
+  return applyTemplate(template, replacements)
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 }
 
-export async function buildDmCodeCommands(codeData: string): Promise<string[]> {
-  const template = await fs.readFile(path.join(getTemplateDirectory(), 'template.prn'), 'utf-8');
-
-  return buildCommandsFromTemplate(template, sanitizeDmCode(codeData));
+function buildDmValues(code: DmPrintCode): Record<string, string> {
+  return buildCommonReplacements({
+    gs1: `$1${sanitizeDmCode(code.code)}`,
+    gs1Dis: formatDmHumanReadable(code.code),
+    date: code.date,
+  });
 }
 
-export async function buildDmBigCodeCommands(codeData: string): Promise<string[]> {
+export async function buildDmCodeCommands(code: DmPrintCode): Promise<string[]> {
+  const template = await fs.readFile(path.join(getTemplateDirectory(), 'template.prn'), 'utf-8');
+
+  return buildCommandsFromTemplate(template, buildDmValues(code));
+}
+
+export async function buildDmBigCodeCommands(code: DmPrintCode): Promise<string[]> {
   const template = await fs.readFile(path.join(getTemplateDirectory(), 'templateBig.prn'), 'utf-8');
 
-  return buildCommandsFromTemplate(template, sanitizeDmCode(codeData));
+  return buildCommandsFromTemplate(template, buildDmValues(code));
 }
 
 export function buildDmEmptyLabelCommands(): string[] {

@@ -46,13 +46,11 @@ export class ReportService {
     this.recordTXTFileDirectory = this.localReportsDirectory;
   }
 
-  /** Формирует отчёт и сохраняет его так же, как старая реализация. */
   async buildAndSaveReport(task: TaskEntity): Promise<ReportObject> {
     const records = await this.reportRepository.getAllReport(task);
     const report = this.createTermetReport(task, records);
     const fileName = this.getReportFileName(task.id);
 
-    // Основной JSON-файл.
     await this.writeToRecordsFile(report, path.join(this.localReportsDirectory, fileName));
 
     try {

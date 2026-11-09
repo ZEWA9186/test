@@ -32,8 +32,10 @@ export class UserService {
       throw new ConflictException('Пользователь с таким именем уже существует');
     }
 
-    if ((await this.userRepository.count()) >= 13) {
-      throw new BadRequestException('Все пользователи уже назначены');
+    if (role === 'operator') {
+      if ((await this.findOperatorUsernames()).length >= 12) {
+        throw new BadRequestException('Все операторы уже назначены');
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

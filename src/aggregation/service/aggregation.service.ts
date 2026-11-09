@@ -18,11 +18,11 @@ export class AggregationService {
 
   async processScan(tsdId: number, code: string) {
     return withOperationLogging({ tsdId, operation: 'processScan', code }, async (context) => {
-      return this.shared.withTransaction(async (manager) => {
-        const activeTask = await this.aggregationRepository.getActiveTaskForUpdate(tsdId, manager);
+      return this.shared.withTransaction(tsdId, async (manager, activeTask) => {
         context.taskId = activeTask.taskId;
 
         const counts = await this.aggregationRepository.getCounts(activeTask, manager);
+
         const expected = AggregationRules.getExpectedScan(activeTask, counts);
         const scanType = this.shared.validateScanType(code, activeTask, expected);
 
@@ -34,6 +34,7 @@ export class AggregationService {
         }
 
         const nextCounts = await this.aggregationRepository.getCounts(activeTask, manager);
+
         return this.getProgress(activeTask, nextCounts);
       });
     });

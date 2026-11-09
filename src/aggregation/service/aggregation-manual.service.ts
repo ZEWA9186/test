@@ -20,8 +20,7 @@ export class AggregationManualService {
 
   async deleteCode(tsdId: number, code: string): Promise<void> {
     return withOperationLogging({ tsdId, operation: 'deleteCode', code }, async (context) => {
-      await this.shared.withTransaction(async (manager) => {
-        const activeTask = await this.shared.getActiveTask(tsdId, manager);
+      await this.shared.withTransaction(tsdId, async (manager, activeTask) => {
         context.taskId = activeTask.taskId;
 
         const deletedCode = await this.aggregationRepository.deleteProduct(
@@ -39,8 +38,7 @@ export class AggregationManualService {
     return withOperationLogging(
       { tsdId, operation: 'deletePackage', packageLabel },
       async (context) => {
-        await this.shared.withTransaction(async (manager) => {
-          const activeTask = await this.shared.getActiveTask(tsdId, manager);
+        await this.shared.withTransaction(tsdId, async (manager, activeTask) => {
           context.taskId = activeTask.taskId;
 
           const codes = await this.aggregationRepository.deletePackage(
@@ -55,7 +53,7 @@ export class AggregationManualService {
     );
   }
 
-  async addProductIntoPackage(packageLabel: string, tsdId: number, code: string) {
+  async addProductIntoPackage(packageLabel: string, tsdId: number, code: string): Promise<void> {
     return withOperationLogging(
       {
         tsdId,
@@ -64,19 +62,18 @@ export class AggregationManualService {
         code,
       },
       async (context) => {
-        const activeTask = await this.shared.getActiveTask(tsdId);
-        context.taskId = activeTask.taskId;
+        await this.shared.withTransaction(tsdId, async (manager, activeTask) => {
+          context.taskId = activeTask.taskId;
+          const expectedPackageType = AggregationRules.getNextContainerType(activeTask);
 
-        const expectedPackageType = AggregationRules.getNextContainerType(activeTask);
-        const packageType = this.shared.validateScanType(
-          packageLabel,
-          activeTask,
-          expectedPackageType,
-        );
+          const packageType = this.shared.validateScanType(
+            packageLabel,
+            activeTask,
+            expectedPackageType,
+          );
 
-        this.shared.validateScanType(code, activeTask, ExpectedScanType.PRODUCT);
+          this.shared.validateScanType(code, activeTask, ExpectedScanType.PRODUCT);
 
-        return this.shared.withTransaction(async (manager) => {
           await this.codeService.validateAndSaveCode(code, manager);
 
           const currentCount = await this.aggregationRepository.countProductsInPackage(
@@ -84,6 +81,7 @@ export class AggregationManualService {
             packageLabel,
             manager,
           );
+
           await this.shared.assertCapacity(packageType, activeTask, currentCount);
 
           await this.aggregationRepository.addProductIntoPackage(
@@ -102,35 +100,42 @@ export class AggregationManualService {
     return withOperationLogging(
       { tsdId, operation: 'moveBox', innerLabel, outerLabel },
       async (context) => {
-        const activeTask = await this.shared.getActiveTask(tsdId);
-        context.taskId = activeTask.taskId;
+        await this.shared.withTransaction(tsdId, async (manager, activeTask) => {
+          context.taskId = activeTask.taskId;
 
-        const outerType = this.gs1Parser.getScanType(outerLabel, activeTask);
-        const expectedInner = AggregationRules.getContentsType(
-          activeTask.aggregationLvl,
-          outerType,
-        );
-        if (expectedInner === null) {
-          throw new BadRequestException();
-        }
+          const innerType = this.gs1Parser.getScanType(innerLabel, activeTask);
 
-        this.shared.validateScanType(innerLabel, activeTask, expectedInner);
+          const expectedOuter = AggregationRules.getOuterType(innerType);
 
-        const outerCount = await this.aggregationRepository.getCountByLabel(
-          outerLabel,
-          outerType,
-          expectedInner,
-          activeTask,
-        );
-        await this.shared.assertCapacity(outerType, activeTask, outerCount);
+          if (expectedOuter === null) {
+            throw new BadRequestException();
+          }
 
-        await this.aggregationRepository.moveBox(
-          innerLabel,
-          outerLabel,
-          outerType,
-          expectedInner,
-          activeTask,
-        );
+          this.shared.validateScanType(outerLabel, activeTask, expectedOuter);
+
+          const outerCount = await this.aggregationRepository.getCountByLabel(
+            outerLabel,
+            expectedOuter,
+            innerType,
+            activeTask,
+            manager,
+          );
+          console.log(outerCount);
+
+          await this.shared.assertCapacity(expectedOuter, activeTask, outerCount);
+
+          const isSmallBox = innerType === ExpectedScanType.SMALL_BOX_LABEL;
+
+          await this.aggregationRepository.moveBox(
+            innerLabel,
+            outerLabel,
+            expectedOuter,
+            innerType,
+            activeTask,
+            isSmallBox,
+            manager,
+          );
+        });
       },
     );
   }

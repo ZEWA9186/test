@@ -13,6 +13,7 @@ import {
   buildDmCodeCommands,
   buildPalletLabelFile,
   buildSmallBoxLabelFile,
+  DmPrintCode,
 } from './printer.utils';
 
 import { printerLogger } from '../logger-winston/winston.config';
@@ -88,11 +89,11 @@ export class PrinterService implements OnModuleInit {
     }
   }
 
-  private async printDmCode(code: string): Promise<void> {
+  private async printDmCode(code: DmPrintCode): Promise<void> {
     try {
       const commands = await buildDmCodeCommands(code);
 
-      await this.printerTransportService.sendCommands(PrinterLabels.Printer2, commands);
+      await this.printerTransportService.sendCommands(PrinterLabels.Printer1, commands);
     } catch (error) {
       this.logger.error('[PRINTER] Ошибка печати кода:', error);
     }
@@ -179,7 +180,7 @@ export class PrinterService implements OnModuleInit {
     }
 
     try {
-      const data = await buildSmallBoxLabelFile(boxNumber, task.piecesPerSmallBox, task);
+      const data = await buildSmallBoxLabelFile(boxNumber, task);
 
       await this.printerTransportService.sendFile(
         getPrinterName(),
@@ -210,7 +211,7 @@ export class PrinterService implements OnModuleInit {
     }
 
     try {
-      const data = await buildBigBoxLabelFile(boxNumber, task.piecesPerBigBox, task);
+      const data = await buildBigBoxLabelFile(boxNumber, task);
 
       await this.printerTransportService.sendFile(
         getPrinterName(),
@@ -241,8 +242,7 @@ export class PrinterService implements OnModuleInit {
         throw new BadRequestException('В задаче не указано количество продуктов на паллете');
       }
 
-      const productsInPallet = await this.taskService.getProductsInPalletId(taskId);
-      const data = await buildPalletLabelFile(palletNumber, task, productsInPallet);
+      const data = await buildPalletLabelFile(palletNumber, task);
 
       await this.printerTransportService.sendFile(
         getPrinterName(),

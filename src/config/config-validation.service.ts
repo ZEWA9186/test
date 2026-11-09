@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { configLogger } from '../logger-winston/winston.config';
 import { initDirectories } from './config.paths';
@@ -16,9 +15,6 @@ interface ConfigDefinition {
 interface ConfigIssue {
   key: string;
   status: 'missing' | 'empty' | 'invalid';
-  purpose: string;
-  currentValue: string;
-  defaultValue: string | null;
   recommendation: string;
 }
 
@@ -200,9 +196,6 @@ export class ConfigValidationService {
         issues.push({
           key: definition.key,
           status: rawValue === undefined ? 'missing' : 'empty',
-          purpose: definition.purpose,
-          currentValue: rawValue === undefined ? 'Переменная отсутствует' : 'Пустая строка',
-          defaultValue: definition.defaultValue ?? null,
           recommendation: definition.example
             ? `Укажи значение, например: ${definition.example}`
             : 'Добавь переменную в .env и укажи корректное значение.',
@@ -217,70 +210,33 @@ export class ConfigValidationService {
         issues.push({
           key: definition.key,
           status: 'invalid',
-          purpose: definition.purpose,
-          currentValue: value,
-          defaultValue: definition.defaultValue ?? null,
           recommendation: validationError,
         });
       }
     }
 
-    const outputDirectory = path.join(process.env.USERPROFILE!, 'Desktop');
-
-    const reportPath = path.join(outputDirectory, 'config-validation.txt');
-
-    const lines = [
-      'ОТЧЁТ ПРОВЕРКИ КОНФИГУРАЦИИ',
-      `Дата проверки: ${new Date().toISOString()}`,
-      `Обнаружено проблем: ${issues.length}`,
-      '',
-    ];
-
+    // Успешная проверка — ничего не логируем.
     if (issues.length === 0) {
-      lines.push('Проблем конфигурации не обнаружено.');
+      return;
     }
 
-    for (const issue of issues) {
-      lines.push(
-        `[ERROR] ${issue.key}`,
-        `Состояние: ${issue.status}`,
-        `Текущее значение: ${issue.currentValue}`,
-        `Назначение: ${issue.purpose}`,
-        `Значение по умолчанию: ${issue.defaultValue ?? 'Не задано'}`,
-        `Рекомендация: ${issue.recommendation}`,
-        '',
-      );
-    }
+    const report = [
+      'ОШИБКА КОНФИГУРАЦИИ',
+      ...issues.map((issue) => {
+        const status = {
+          missing: 'Переменная отсутствует',
+          empty: 'Пустое значение',
+          invalid: 'Некорректное значение',
+        }[issue.status];
 
-    try {
-      await fs.mkdir(outputDirectory, { recursive: true });
-      await fs.writeFile(reportPath, lines.join('\n'), 'utf8');
-    } catch (error) {
-      configLogger.error(
-        `Не удалось сохранить отчёт: ${error instanceof Error ? error.message : String(error)}`,
-      );
+        return `[ERROR] ${issue.key}: ${status}. ${issue.recommendation}`;
+      }),
+    ].join('\n');
 
-      // Если обязательные настройки некорректны, не скрываем исходную проблему.
-      if (issues.length > 0) {
-        throw new Error(
-          `Конфигурация невалидна (${issues.length} проблем), ` + 'и не удалось сохранить отчёт.',
-        );
-      }
+    configLogger.error(report);
 
-      throw error;
-    }
-
-    if (issues.length > 0) {
-      const summary = issues.map((issue) => `${issue.key}: ${issue.recommendation}`).join('\n');
-
-      configLogger.error(`Обнаружено проблем конфигурации: ${issues.length}. Отчёт: ${reportPath}`);
-
-      throw new Error(`Конфигурация невалидна. Исправь .env:\n${summary}\nОтчёт: ${reportPath}`);
-    }
-
-    configLogger.info(`Конфигурация проверена. Отчёт: ${reportPath}`);
+    throw new Error('Конфигурация невалидна. Исправь .env.');
   }
-
   async initDirectories(): Promise<void> {
     await initDirectories();
   }

@@ -17,7 +17,6 @@ const interval = Number(getCheck1SInterval()) || 60000;
 
 @Injectable()
 export class Task1sService implements OnModuleInit {
-  private files: string[] = [];
   private filesIn: string[] = [];
   private checkInterval: NodeJS.Timeout;
 
@@ -56,17 +55,6 @@ export class Task1sService implements OnModuleInit {
       throw new HttpException(result, HttpStatus.BAD_REQUEST);
     }
     return result;
-  }
-
-  public async getFiles(): Promise<string[]> {
-    return this.files;
-  }
-
-  public async refreshFiles(): Promise<string[]> {
-    await this.checkFilesInDirectory();
-    const directoryPath = getJsonDirectory1S();
-    const allFiles = await fs.promises.readdir(directoryPath);
-    return allFiles.filter((file) => file.endsWith('.json'));
   }
 
   public async checkFilesInDirectory() {

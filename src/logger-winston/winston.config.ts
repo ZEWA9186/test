@@ -1,8 +1,12 @@
 import * as winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
-import * as path from 'path';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
-const LOGS_DIR = path.join(process.cwd(), 'logs');
+const LOGS_DIR = path.join(path.dirname(process.execPath), 'logs');
+
+fs.mkdirSync(LOGS_DIR, { recursive: true });
+
 const MAX_IN_MEMORY_LOGS = 1000;
 let logMessages: any[] = [];
 
@@ -54,6 +58,7 @@ const createLogger = (filename: string) => {
           ),
         ),
       }),
+
       combinedTransport,
     ],
   });

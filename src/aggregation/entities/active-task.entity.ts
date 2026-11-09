@@ -27,14 +27,6 @@ export class ActiveTaskEntity {
   @Column({ name: 'pieces_per_pallet', nullable: true, type: 'int' })
   piecesPerPallet: number;
 
-  @Column({
-    name: 'expected_scan',
-    type: 'enum',
-    enum: ExpectedScanType,
-    default: ExpectedScanType.PRODUCT,
-  })
-  expectedScan: ExpectedScanType;
-
   @Column({ name: 'aggregation_lvl', nullable: true, type: 'int' })
   aggregationLvl: number;
 

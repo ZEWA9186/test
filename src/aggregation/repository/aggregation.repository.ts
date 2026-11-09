@@ -195,17 +195,6 @@ export class AggregationRepository {
     const outerColumn = AggregationRules.getColumnByScanType(outerType);
     const em = this.getManager(manager);
 
-    if (innerType === ExpectedScanType.PRODUCT) {
-      const rows: Array<{ count: string | number }> = await em.query(
-        `SELECT COUNT(*) AS "count"
-       FROM ${table}
-       WHERE ${outerColumn} = $1
-         AND tsd_id = $2`,
-        [label, activeTask.tsdId],
-      );
-      return Number(rows[0]?.count ?? 0);
-    }
-
     const innerColumn = AggregationRules.getColumnByScanType(innerType);
 
     const rows: Array<{ count: string | number }> = await em.query(
@@ -224,13 +213,6 @@ export class AggregationRepository {
     activeTask: ActiveTaskEntity,
     manager?: EntityManager,
   ): Promise<TaskPackagingStats> {
-    if (!manager) {
-      //Изоляция для разбиения на несколько методов
-      return this.entityManager.transaction('REPEATABLE READ', (transactionManager) =>
-        this.getTaskPackagingStats(activeTask, transactionManager),
-      );
-    }
-
     const rules = AggregationRules.getContainerRules(activeTask);
     const statsByScanType = new Map<ExpectedScanType, ContainerFillStats[]>();
 
@@ -635,20 +617,44 @@ export class AggregationRepository {
     outerType: ExpectedScanType,
     innerType: ExpectedScanType,
     activeTask: ActiveTaskEntity,
+    isSmallBox: boolean,
     manager?: EntityManager,
   ): Promise<void> {
     const table = this.getPackagingTable(activeTask);
     const outerColumn = AggregationRules.getColumnByScanType(outerType);
     const innerColumn = AggregationRules.getColumnByScanType(innerType);
-
-    await this.getManager(manager).query(
-      `
+    let palletLabel;
+    if (isSmallBox) {
+      palletLabel = await this.getManager(manager).query(
+        `
+      SELECT pallet_label
+      FROM ${table}
+      WHERE ${outerColumn} = $1
+      LIMIT 1
+      `,
+        [outerColumn],
+      );
+    }
+    if (palletLabel && palletLabel.length === 0) {
+      await this.getManager(manager).query(
+        `
+        UPDATE ${table}
+        SET ${outerColumn} = $1,
+            pallet_label   = $2
+        WHERE ${innerColumn} = $3
+      `,
+        [outerLabel, palletLabel[0], innerLabel],
+      );
+    } else {
+      await this.getManager(manager).query(
+        `
         UPDATE ${table}
         SET ${outerColumn} = $1
         WHERE ${innerColumn} = $2
       `,
-      [outerLabel, innerLabel],
-    );
+        [outerLabel, innerLabel],
+      );
+    }
   }
 
   async deletePackage(

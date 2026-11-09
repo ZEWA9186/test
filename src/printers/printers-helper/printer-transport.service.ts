@@ -29,7 +29,7 @@ export class PrinterTransportService {
 
     const buffers = commands.map((command) =>
       typeof command === 'string'
-        ? Buffer.from(command + '\n', 'ascii')
+        ? Buffer.from(command + '\n', 'utf8')
         : Buffer.concat([command, Buffer.from('\n', 'ascii')]),
     );
 

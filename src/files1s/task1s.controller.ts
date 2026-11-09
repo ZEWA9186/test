@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Post,
-  Body,
-  HttpStatus,
-  HttpCode,
-  Get,
-} from '@nestjs/common';
+import { Controller, Post, Body, HttpStatus, HttpCode, Get } from '@nestjs/common';
 import { Task1sService } from './task1s.service';
 import { TaskCheckResult } from './dto/task-check-result';
 
@@ -22,15 +15,5 @@ export class Task1sController {
   @Get('check')
   async checkFilesInDirectory(): Promise<TaskCheckResult[]> {
     return await this.task1sService.checkFilesInDirectory();
-  }
-
-  @Get()
-  async getFiles(): Promise<string[]> {
-    return this.task1sService.getFiles();
-  }
-
-  @Get('refresh')
-  async refreshFiles(): Promise<string[]> {
-    return this.task1sService.refreshFiles();
   }
 }
