@@ -28,12 +28,6 @@ export class ConfigValidationService {
       example: 'C:/Users/admin/Documents/test-server1s',
     },
     {
-      key: 'FILES_DIRECTORY',
-      required: false,
-      purpose: 'Основная директория файлов.',
-      example: 'C:/Users/admin/Documents/test-server1s/files',
-    },
-    {
       key: 'FILES_DIRECTORY_1S',
       required: true,
       purpose: 'Каталог JSON-файлов заданий.',

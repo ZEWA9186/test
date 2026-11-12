@@ -35,6 +35,31 @@ export class PrinterMonitoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Проверить конкретный принтер по имени.
+   * Возвращает true, если хост отвечает на ping.
+   */
+  async isPrinterAlive(name: string): Promise<boolean> {
+    const endpoint = this.printerConnectionService.getEndpoint(name);
+
+    if (!endpoint) {
+      return false;
+    }
+
+    try {
+      const result = await ping.promise.probe(endpoint.host, { timeout: 2 });
+
+      this.printerConnectionService.setConnected(name, result.alive);
+
+      return result.alive;
+    } catch (error: any) {
+      this.printerConnectionService.setConnected(name, false);
+      this.logger.error(`Printer ping error (${name}): ${error.message}`);
+
+      return false;
+    }
+  }
+
+  /**
    * Проверить все подключённые принтеры.
    */
   private async checkPrinters(): Promise<void> {
@@ -42,9 +67,7 @@ export class PrinterMonitoringService implements OnModuleInit, OnModuleDestroy {
       const printers = this.printerConnectionService.getPrintersForMonitoring();
 
       for (const printer of printers) {
-        const result = await ping.promise.probe(printer.host);
-
-        this.printerConnectionService.setConnected(printer.name, result.alive);
+        await this.isPrinterAlive(printer.name);
       }
 
       const statuses = this.printerConnectionService.getStatuses();

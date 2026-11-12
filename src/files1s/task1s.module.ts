@@ -6,7 +6,6 @@ import { TaskEntity } from '../task/entities/task.entity';
 import { TaskCodesEntity } from '../task/entities/task-codes.entity';
 import { ValidationModule } from '../validation/validation.module';
 
-
 @Module({
   imports: [TypeOrmModule.forFeature([TaskEntity, TaskCodesEntity]), ValidationModule],
   controllers: [Task1sController],

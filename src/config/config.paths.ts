@@ -13,8 +13,6 @@ const getEnv = (key: string): string => {
 
 export const getAvailableFilesDirectory = (): string => getEnv('AVAILABLE_FILES_DIRECTORY');
 
-export const getFilesDirectory = (): string => getEnv('FILES_DIRECTORY');
-
 export const getJsonDirectory1S = (): string => getEnv('FILES_DIRECTORY_1S');
 
 export const getJsonDirectory1STemplate = (): string => getEnv('FILES_DIRECTORY_1S_TEMPLATE');
@@ -38,7 +36,6 @@ export const getBackupDirectories = (): string[] =>
 
 export async function initDirectories(): Promise<void> {
   const directories = [
-    getFilesDirectory(),
     getJsonDirectory1S(),
     getJsonDirectory1STemplate(),
     getJsonDirectory1SRecord(),

@@ -33,6 +33,17 @@ export class PrinterController {
   }
 
   @Header('Cache-Control', 'no-store')
+  @Get(':label/ping')
+  async pingPrinter(@Param('label') label: PrinterLabels): Promise<{
+    name: PrinterLabels;
+    alive: boolean;
+  }> {
+    const alive = await this.printerService.getPrinterAliveStatus(label);
+
+    return { name: label, alive };
+  }
+
+  @Header('Cache-Control', 'no-store')
   @Get(':label')
   async getConfig(@Param('label') label: PrinterLabels): Promise<any> {
     try {

@@ -51,7 +51,7 @@ export class UserService {
     return this.toPublicUser(savedUser);
   }
 
-  async authUser(username: string, password: string, key: string): Promise<Partial<User>> {
+  async authUser(username: string, password: string, key?: string): Promise<Partial<User>> {
     if (!username || !password) {
       throw new BadRequestException('Имя и пароль обязательны');
     }

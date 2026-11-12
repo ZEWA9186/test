@@ -17,7 +17,7 @@ export class UserController {
 
   @Post('auth')
   async auth(
-    @Body() authUserDto: { username: string; password: string; key: string },
+    @Body() authUserDto: { username: string; password: string; key?: string },
   ): Promise<Partial<User>> {
     const { username, password, key } = authUserDto;
     console.log(username, password);

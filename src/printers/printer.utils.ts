@@ -25,6 +25,7 @@ interface LabelBuildOptions {
   description: string;
   date?: string;
   batch?: string;
+  id?: string;
 }
 
 interface CommonReplacementsInput {
@@ -33,6 +34,7 @@ interface CommonReplacementsInput {
   gs1Dis?: string;
   date?: string;
   batch?: string;
+  id?: string;
 }
 //Заглушка
 const NUMBER_PLACEHOLDER = '001';
@@ -46,7 +48,7 @@ function buildCommonReplacements(values: CommonReplacementsInput): Record<string
     '<GS1_dis>': values.gs1Dis ?? '',
     '<DATE>': values.date ?? '',
     '<PARTY>': values.batch ?? '',
-    '<NUMBER>': NUMBER_PLACEHOLDER,
+    '<NUMBER>': values.id ?? NUMBER_PLACEHOLDER,
   };
 }
 
@@ -65,7 +67,7 @@ async function readTemplate(templateName: string): Promise<string> {
 }
 
 async function buildLabelFile(options: LabelBuildOptions): Promise<Buffer> {
-  const { templateName, packageCode, number, description, date, batch } = options;
+  const { templateName, packageCode, number, description, date, batch, id } = options;
 
   if (!templateName) {
     throw new Error(`Не задана этикетка для ${description}`);
@@ -73,7 +75,7 @@ async function buildLabelFile(options: LabelBuildOptions): Promise<Buffer> {
 
   const template = await readTemplate(templateName);
   const sscc = generateLabel(packageCode, `${number}`);
-  const rendered = applyTemplate(template, buildCommonReplacements({ sscc, date, batch }));
+  const rendered = applyTemplate(template, buildCommonReplacements({ sscc, date, batch, id }));
 
   return iconv.encode(rendered, PRINT_ENCODING);
 }
@@ -86,6 +88,7 @@ export async function buildSmallBoxLabelFile(boxNumber: number, task: TaskEntity
     description: `малой коробки ${boxNumber}`,
     date: task.dateManufacture.slice(3),
     batch: task.batch,
+    id: String(boxNumber),
   });
 }
 
@@ -97,6 +100,7 @@ export async function buildBigBoxLabelFile(boxNumber: number, task: TaskEntity):
     description: `большой коробки ${boxNumber}`,
     date: task.dateManufacture.slice(3),
     batch: task.batch,
+    id: String(boxNumber),
   });
 }
 
@@ -111,6 +115,7 @@ export async function buildPalletLabelFile(
     description: `паллеты ${palletNumber}`,
     date: task.dateManufacture.slice(3),
     batch: task.batch,
+    id: String(palletNumber),
   });
 }
 
@@ -145,6 +150,7 @@ function buildDmValues(code: DmPrintCode): Record<string, string> {
     gs1: `$1${sanitizeDmCode(code.code)}`,
     gs1Dis: formatDmHumanReadable(code.code),
     date: code.date,
+    id: String(code.id),
   });
 }
 
