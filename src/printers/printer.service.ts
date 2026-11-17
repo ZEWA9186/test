@@ -65,24 +65,27 @@ export class PrinterService implements OnModuleInit {
     await this.printerConnectionService.applyConfig(config);
   }
 
-  public async connectPrinter(name: string): Promise<void> {
-    const config = await this.printerConfigService.findByName(name);
-
-    if (!config) {
-      throw new BadRequestException(`Принтер: конфигурация для ${name} не найдена`);
-    }
-
-    await this.printerConnectionService.connect(config);
-  }
-
   public async printAllDM(id: number): Promise<void> {
     try {
       await this.assertPrinterAlive(PrinterLabels.Printer1);
 
       const codes = await this.taskService.getCodesToPrintByTaskId(id);
-      let i = 0;
       for (const code of codes) {
-        code.id = i++;
+        await this.printDmCode(code);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    } catch (err) {
+      this.logger.error(`Ошибка печати датаматриксов для задачи ${id}`, err);
+      throw this.toPrintException(err, `Ошибка печати датаматриксов для задачи ${id}`);
+    }
+  }
+
+  async additionalPrintDM(id: number): Promise<void> {
+    try {
+      await this.assertPrinterAlive(PrinterLabels.Printer1);
+
+      const codes = await this.taskService.getUnprintedCodesByTaskId(id);
+      for (const code of codes) {
         await this.printDmCode(code);
         await new Promise((resolve) => setTimeout(resolve, 100));
       }

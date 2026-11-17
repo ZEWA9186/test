@@ -17,6 +17,7 @@ import { TaskCodesEntity } from './entities/task-codes.entity';
 import { PackagingTableManager } from '../aggregation/repository/packaging-table-manager.service';
 import { ReportService } from './reports/report.service';
 import { getCodesDirectory } from '../config/config.paths';
+import { CodeService } from '../code/code.service';
 
 @Injectable()
 export class TaskService {
@@ -31,6 +32,7 @@ export class TaskService {
     private readonly taskCodesRepository: Repository<TaskCodesEntity>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly codeService: CodeService,
     private readonly packagingTableManager: PackagingTableManager,
     private readonly reportService: ReportService,
   ) {}
@@ -62,6 +64,23 @@ export class TaskService {
       date: `${String(code.createdAt.getMonth() + 1).padStart(2, '0')}.${code.createdAt.getFullYear()}`,
       code: code.code,
     }));
+  }
+
+  async getUnprintedCodesByTaskId(taskId: number): Promise<any[]> {
+    const allCodes = await this.taskCodesRepository.find({
+      where: { taskId },
+    });
+
+    const scannedCodes = await this.codeService.getCodes(allCodes.map((code) => code.code));
+    const scannedSet = new Set(scannedCodes);
+
+    return allCodes
+      .filter((code) => !scannedSet.has(code.code))
+      .map((code) => ({
+        id: code.id,
+        date: `${String(code.createdAt.getMonth() + 1).padStart(2, '0')}.${code.createdAt.getFullYear()}`,
+        code: code.code,
+      }));
   }
 
   async createTask(data: any, nomenclatureId: number, numberValue?: number): Promise<TaskEntity> {

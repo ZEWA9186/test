@@ -13,6 +13,7 @@ import { NomenclaturesModule } from '../nomenclatures/nomenclatures.module';
 import { AggregationModule } from '../aggregation/aggregation.module';
 import { ReportService } from './reports/report.service';
 import { ReportRepository } from './reports/report.repository';
+import { CodeModule } from '../code/code.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ReportRepository } from './reports/report.repository';
     ValidationModule,
     NomenclaturesModule,
     AggregationModule,
+    CodeModule,
   ],
   controllers: [TaskController],
   providers: [TaskService, ReportService, ReportRepository],

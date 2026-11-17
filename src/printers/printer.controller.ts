@@ -32,6 +32,11 @@ export class PrinterController {
     await this.printerService.printAllDM(taskId);
   }
 
+  @Post('additional-print-DM')
+  async additionalPrintDM(@Body('taskId') taskId: number): Promise<void> {
+    await this.printerService.additionalPrintDM(taskId);
+  }
+
   @Header('Cache-Control', 'no-store')
   @Get(':label/ping')
   async pingPrinter(@Param('label') label: PrinterLabels): Promise<{
