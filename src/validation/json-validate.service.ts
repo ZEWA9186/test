@@ -24,7 +24,7 @@ export class JsonValidationService {
     const items: string[] = [];
     let codes: string[] = [];
 
-    const aggregationLevel = Number(jsonData.aggregationLvl);
+    // const aggregationLevel = Number(jsonData.aggregationLvl);
     const templateDir = getJsonDirectory1STemplate();
     let templateFields: string[] = [];
 
@@ -71,7 +71,7 @@ export class JsonValidationService {
     // 3. Проверяем наличие полей из шаблона в JSON
     for (const fieldName of templateFields) {
       const fieldInfo = TASK.find((field) => field.name === fieldName);
-      const required = fieldInfo ? this.isRequiredForLevel(fieldInfo, aggregationLevel) : true;
+      const required = fieldInfo ? this.isRequiredForLevel(fieldInfo /*,aggregationLevel*/) : true;
 
       if (required && !(fieldName in jsonData)) {
         const fieldLabel = fieldInfo?.label || fieldName;
@@ -88,7 +88,7 @@ export class JsonValidationService {
         continue;
       }
 
-      const required = this.isRequiredForLevel(field, aggregationLevel);
+      const required = this.isRequiredForLevel(field /*,aggregationLevel*/);
       const isEmpty =
         value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
 
@@ -144,64 +144,65 @@ export class JsonValidationService {
           }
           break;
 
-        case 'codes': {
-          try {
-            const codeValidation = isCodeFilterEnabled()
-              ? await this.codeValidationService.cleanAndFilterCodes(value, jsonData.gtin)
-              : await this.codeValidationService.validate(value, jsonData.gtin);
-
-            if (codeValidation.errors.length > 0) {
-              errors.push(...codeValidation.errors);
-              items.push(...codeValidation.items);
-            }
-
-            if (codeValidation.codes) {
-              codes = codeValidation.codes;
-            }
-          } catch (err: any) {
-            logger1S.error('[VALIDATION] Ошибка при валидации кодов:', err.message);
-            errors.push('Ошибка валидации кодов');
-            items.push(field.name);
-          }
-          break;
-        }
-
-        case 'smallBoxLabel':
-        case 'bigBoxLabel':
-        case 'palletLabel': {
-          const templateDirectory = getTemplateDirectory();
-          const templateFilePath = path.join(templateDirectory, `${value}.prn`);
-
-          try {
-            await fs.promises.access(templateFilePath);
-          } catch {
-            errors.push(`Шаблон ${field.label} не найден: ${value}.prn`);
-            items.push(field.name);
-          }
-          break;
-        }
+        //   case 'codes': {
+        //     try {
+        //       const codeValidation = isCodeFilterEnabled()
+        //         ? await this.codeValidationService.cleanAndFilterCodes(value, jsonData.gtin)
+        //         : await this.codeValidationService.validate(value, jsonData.gtin);
+        //
+        //       if (codeValidation.errors.length > 0) {
+        //         errors.push(...codeValidation.errors);
+        //         items.push(...codeValidation.items);
+        //       }
+        //
+        //       if (codeValidation.codes) {
+        //         codes = codeValidation.codes;
+        //       }
+        //     } catch (err: any) {
+        //       logger1S.error('[VALIDATION] Ошибка при валидации кодов:', err.message);
+        //       errors.push('Ошибка валидации кодов');
+        //       items.push(field.name);
+        //     }
+        //     break;
+        //   }
+        //
+        //   case 'smallBoxLabel':
+        //   case 'bigBoxLabel':
+        //   case 'palletLabel': {
+        //     const templateDirectory = getTemplateDirectory();
+        //     const templateFilePath = path.join(templateDirectory, `${value}.prn`);
+        //
+        //     try {
+        //       await fs.promises.access(templateFilePath);
+        //     } catch {
+        //       errors.push(`Шаблон ${field.label} не найден: ${value}.prn`);
+        //       items.push(field.name);
+        //     }
+        //     break;
+        //   }
+        // }
       }
     }
 
     return { codes, errors, items };
   }
 
-  private isRequiredForLevel(field: (typeof TASK)[number], aggregationLevel: number): boolean {
-    if (field.name === 'smallBoxLabel') {
-      return aggregationLevel === 3;
-    }
-
-    if (field.name === 'bigBoxLabel') {
-      return aggregationLevel >= 2;
-    }
-
-    if (field.name === 'piecesPerSmallBox') {
-      return aggregationLevel === 3;
-    }
-
-    if (field.name === 'piecesPerBigBox') {
-      return aggregationLevel >= 2;
-    }
+  private isRequiredForLevel(field: (typeof TASK)[number] /*,aggregationLevel: number*/): boolean {
+    // if (field.name === 'smallBoxLabel') {
+    //   return aggregationLevel === 3;
+    // }
+    //
+    // if (field.name === 'bigBoxLabel') {
+    //   return aggregationLevel >= 2;
+    // }
+    //
+    // if (field.name === 'piecesPerSmallBox') {
+    //   return aggregationLevel === 3;
+    // }
+    //
+    // if (field.name === 'piecesPerBigBox') {
+    //   return aggregationLevel >= 2;
+    // }
 
     return field.required === true;
   }

@@ -16,12 +16,12 @@ export class TaskCodesEntity {
   @Column({ name: 'code', type: 'varchar', unique: true })
   code: string;
 
-  // Внешний ключ на задачу (обязателен, чтобы знать, к какому заданию относится код)
-  @Column({ name: 'task_id', type: 'int', nullable: false })
-  taskId: number;
+  // Связь с задачей — по externalId, потому что tasks.id больше не unique.
+  @Column({ name: 'external_id', type: 'uuid' })
+  externalId: string;
 
   @ManyToOne(() => TaskEntity, (task) => task.codes, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'task_id' })
+  @JoinColumn({ name: 'external_id', referencedColumnName: 'externalId' })
   task: TaskEntity;
 
   @CreateDateColumn({ name: 'created_at' })

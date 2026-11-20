@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseIntPipe,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 
 import { AggregationService } from './service/aggregation.service';
 import { AggregationManualService } from './service/aggregation-manual.service';
@@ -25,13 +16,13 @@ export class AggregationController {
 
   @Post(':id')
   @HttpCode(HttpStatus.OK)
-  async sendCode(@Param('id', ParseIntPipe) tsdId: number, @Body() body: { code: string }) {
+  async sendCode(@Param('id') tsdId: string, @Body() body: { code: string }) {
     return this.aggregationService.processScan(tsdId, body.code);
   }
 
   @Get(':id/get-current-state')
   @HttpCode(HttpStatus.OK)
-  async getCurrentState(@Param('id', ParseIntPipe) tsdId: number) {
+  async getCurrentState(@Param('id') tsdId: string) {
     return await this.aggregationService.getCurrentState(tsdId);
   }
 
@@ -39,23 +30,20 @@ export class AggregationController {
 
   @Post(':id/delete-code')
   @HttpCode(HttpStatus.OK)
-  async deleteCode(@Param('id', ParseIntPipe) tsdId: number, @Body() body: { code: string }) {
+  async deleteCode(@Param('id') tsdId: string, @Body() body: { code: string }) {
     await this.aggregationManualService.deleteCode(tsdId, body.code);
   }
 
   @Post(':id/delete-package')
   @HttpCode(HttpStatus.OK)
-  async deletePackage(
-    @Param('id', ParseIntPipe) tsdId: number,
-    @Body() body: { packageLabel: string },
-  ) {
+  async deletePackage(@Param('id') tsdId: string, @Body() body: { packageLabel: string }) {
     await this.aggregationManualService.deletePackage(tsdId, body.packageLabel);
   }
 
   @Post(':id/move-box')
   @HttpCode(HttpStatus.OK)
   async moveBox(
-    @Param('id', ParseIntPipe) tsdId: number,
+    @Param('id') tsdId: string,
     @Body() body: { innerLabel: string; outerLabel: string },
   ) {
     await this.aggregationManualService.moveBox(body.innerLabel, body.outerLabel, tsdId);
@@ -64,7 +52,7 @@ export class AggregationController {
   @Post(':id/add-product-into-package')
   @HttpCode(HttpStatus.OK)
   async addProductIntoPackage(
-    @Param('id', ParseIntPipe) tsdId: number,
+    @Param('id') tsdId: string,
     @Body() body: { packageLabel: string; code: string },
   ) {
     return this.aggregationManualService.addProductIntoPackage(body.packageLabel, tsdId, body.code);
@@ -74,16 +62,13 @@ export class AggregationController {
 
   @Post(':id/search-product')
   @HttpCode(HttpStatus.OK)
-  async searchProductInfo(
-    @Param('id', ParseIntPipe) tsdId: number,
-    @Body() body: { code: string },
-  ) {
+  async searchProductInfo(@Param('id') tsdId: string, @Body() body: { code: string }) {
     return this.aggregationReportService.searchInfo(tsdId, body.code);
   }
 
   @Get(':id/getStats')
   @HttpCode(HttpStatus.OK)
-  async getStats(@Param('id', ParseIntPipe) tsdId: number) {
+  async getStats(@Param('id') tsdId: string) {
     return await this.aggregationReportService.validateTaskCompletion(tsdId);
   }
 

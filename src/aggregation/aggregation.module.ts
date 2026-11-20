@@ -11,6 +11,7 @@ import { TaskCodesEntity } from '../task/entities/task-codes.entity';
 import { AggregationManualService } from './service/aggregation-manual.service';
 import { AggregationReportService } from './service/aggregation-report.service';
 import { AggregationSharedService } from './service/aggregation-shared.service';
+import { AggregationGateway } from './aggregation.gateway';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AggregationSharedService } from './service/aggregation-shared.service';
     AggregationReportService,
     AggregationRepository,
     PackagingTableManager,
+    AggregationGateway,
   ],
   exports: [AggregationService, PackagingTableManager],
 })

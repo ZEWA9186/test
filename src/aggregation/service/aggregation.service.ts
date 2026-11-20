@@ -7,6 +7,7 @@ import { withOperationLogging } from '../helper-service/aggregation-operation-lo
 import { AggregationRules } from '../helper-service/aggregation.rules';
 import { AggregationCounts } from '../entities/aggregation-counts';
 import { AggregationResponseDto } from '../dto/responce.dto';
+import { AggregationGateway } from '../aggregation.gateway';
 
 @Injectable()
 export class AggregationService {
@@ -14,11 +15,12 @@ export class AggregationService {
     private readonly shared: AggregationSharedService,
     private readonly aggregationRepository: AggregationRepository,
     private readonly codeService: CodeService,
+    private readonly aggregationGateway: AggregationGateway,
   ) {}
 
-  async processScan(tsdId: number, code: string) {
+  async processScan(tsdId: string, code: string) {
     return withOperationLogging({ tsdId, operation: 'processScan', code }, async (context) => {
-      return this.shared.withTransaction(tsdId, async (manager, activeTask) => {
+      const result = await this.shared.withTransaction(tsdId, async (manager, activeTask) => {
         context.taskId = activeTask.taskId;
 
         const counts = await this.aggregationRepository.getCounts(activeTask, manager);
@@ -37,10 +39,30 @@ export class AggregationService {
 
         return this.getProgress(activeTask, nextCounts);
       });
+
+      try {
+        if (context.taskId != null) {
+          const state = await this.getCurrentState(tsdId);
+
+          if (state.pallet) {
+            this.aggregationGateway.sendPalletCounter({
+              taskId: context.taskId,
+              pallet: {
+                current: state.pallet.current,
+                limit: state.pallet.limit,
+              },
+            });
+          }
+        }
+      } catch {
+        // Состояние для WebSocket не должно ломать успешный скан.
+      }
+
+      return result;
     });
   }
 
-  async getCurrentState(tsdId: number) {
+  async getCurrentState(tsdId: string) {
     const activeTask = await this.shared.getActiveTask(tsdId);
     const counts = await this.aggregationRepository.getCounts(activeTask);
     return this.getProgress(activeTask, counts);
@@ -54,7 +76,11 @@ export class AggregationService {
       return {
         smallBox: null,
         bigBox: null,
-        pallet: { current: counts.openProducts, limit: activeTask.piecesPerPallet },
+        pallet: {
+          current: counts.openProducts,
+          limit: activeTask.piecesPerPallet,
+          shared: true,
+        },
         expectedScan,
       };
     }
@@ -69,6 +95,7 @@ export class AggregationService {
         pallet: {
           current: counts.closedBigBoxes,
           limit: activeTask.piecesPerPallet,
+          shared: true,
         },
         expectedScan,
       };
@@ -86,6 +113,7 @@ export class AggregationService {
       pallet: {
         current: counts.closedBigBoxes,
         limit: activeTask.piecesPerPallet,
+        shared: true,
       },
       expectedScan,
     };

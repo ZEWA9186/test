@@ -17,7 +17,7 @@ export class AggregationSharedService {
     private readonly gs1Parser: Gs1ParserService,
   ) {}
 
-  async getActiveTask(tsdId: number, manager?: EntityManager): Promise<ActiveTaskEntity> {
+  async getActiveTask(tsdId: string, manager?: EntityManager): Promise<ActiveTaskEntity> {
     const activeTask = await this.aggregationRepository.getActiveTask(tsdId, manager);
     if (!activeTask) throw new BadRequestException('Активное задание не назначено');
     return activeTask;
@@ -39,7 +39,7 @@ export class AggregationSharedService {
   }
 
   withTransaction<T>(
-    tsdId: number,
+    tsdId: string,
     cb: (manager: EntityManager, activeTask: ActiveTaskEntity) => Promise<T>,
   ): Promise<T> {
     return this.dataSource.transaction(async (manager) => {
@@ -57,7 +57,7 @@ export class AggregationSharedService {
     });
   }
   async withReadTransaction<T>(
-    tsdId: number,
+    tsdId: string,
     cb: (manager: EntityManager, activeTask: ActiveTaskEntity) => Promise<T>,
   ): Promise<T> {
     return this.dataSource.transaction('REPEATABLE READ', async (manager) => {

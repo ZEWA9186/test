@@ -27,26 +27,23 @@ export class TaskController {
   }
 
   @Get('tsd/:tsdId/history')
-  async getHistoryTasksForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
+  async getHistoryTasksForTsd(@Param('tsdId') tsdId: string) {
     return await this.taskService.getTaskHistoryForTsd(tsdId);
   }
 
   @Post('tsd/:tsdId/history/:id/start')
   @HttpCode(HttpStatus.OK)
-  async startHistoryTask(
-    @Param('tsdId', ParseIntPipe) tsdId: number,
-    @Param('id', ParseIntPipe) taskId: number,
-  ) {
+  async startHistoryTask(@Param('tsdId') tsdId: string, @Param('id', ParseIntPipe) taskId: number) {
     return this.taskService.startHistoryTask(tsdId, taskId);
   }
 
   @Get('tsd/:tsdId/in-work')
-  async getTaskInWorkForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
+  async getTaskInWorkForTsd(@Param('tsdId') tsdId: string) {
     return await this.taskService.getTaskInWorkForTsd(tsdId);
   }
 
   @Get('tsd/:tsdId/unprocessed')
-  async getTaskUnprocessedForTsd(@Param('tsdId', ParseIntPipe) tsdId: number) {
+  async getTaskUnprocessedForTsd(@Param('tsdId') tsdId: string) {
     return await this.taskService.getTaskUnprocessedForTsd(tsdId);
   }
 
@@ -70,28 +67,31 @@ export class TaskController {
 
   @Post(':id/appoint-tsds')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async appointTsds(@Param('id', ParseIntPipe) id: number, @Body('tsdIds') tsdIds: number[]) {
+  async appointTsds(@Param('id', ParseIntPipe) id: number, @Body('tsdIds') tsdIds: string[]) {
     await this.taskService.appointTsds(tsdIds, id);
+  }
+
+  @Post('continue')
+  @HttpCode(HttpStatus.OK)
+  async continueTask(@Body() body: { code: string; tsdId: string }) {
+    return this.taskService.continueTask(body.code, body.tsdId);
   }
 
   @Post(':id/start')
   @HttpCode(HttpStatus.OK)
-  async startTask(
-    @Param('id', ParseIntPipe) taskId: number,
-    @Body('tsdId', ParseIntPipe) tsdId: number,
-  ) {
+  async startTask(@Param('id', ParseIntPipe) taskId: number, @Body('tsdId') tsdId: string) {
     await this.taskService.startTask(tsdId, taskId);
   }
 
   @Get('tsd/active/:tsdId')
   @HttpCode(HttpStatus.OK)
-  async activeTask(@Param('tsdId', ParseIntPipe) tsdId: number) {
+  async activeTask(@Param('tsdId') tsdId: string) {
     return await this.taskService.getActiveTaskIdByTsdId(tsdId);
   }
 
   @Post(':tsdId/complete')
   @HttpCode(HttpStatus.OK)
-  async completeTask(@Param('tsdId', ParseIntPipe) tsdId: number) {
+  async completeTask(@Param('tsdId') tsdId: string) {
     await this.taskService.completeTask(tsdId);
   }
 }

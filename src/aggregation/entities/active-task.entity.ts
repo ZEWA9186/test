@@ -9,8 +9,8 @@ export enum ExpectedScanType {
 
 @Entity('active_tasks')
 export class ActiveTaskEntity {
-  @PrimaryColumn({ name: 'tsd_id', type: 'int' })
-  tsdId: number;
+  @PrimaryColumn({ name: 'tsd_id', type: 'text' })
+  tsdId: string;
 
   @Column({ name: 'task_id', type: 'int', nullable: true })
   taskId: number | null;

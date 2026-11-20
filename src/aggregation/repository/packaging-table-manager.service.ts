@@ -20,7 +20,7 @@ export class PackagingTableManager {
         small_box_label TEXT NULL,
         big_box_label TEXT NULL,
         pallet_label TEXT NULL,
-        tsd_id INTEGER NOT NULL,
+        tsd_id TEXT NOT NULL,
         created_at TIMESTAMP WITHOUT TIME ZONE
           NOT NULL DEFAULT CURRENT_TIMESTAMP
       )

@@ -11,6 +11,7 @@ export const DatabaseProviders = TypeOrmModule.forRoot({
   username: username ?? 'postgres',
   password: password ?? '123',
   database: database ?? 'server_trial_db',
+  uuidExtension: 'pgcrypto',
   autoLoadEntities: true,
   synchronize: true,
 });

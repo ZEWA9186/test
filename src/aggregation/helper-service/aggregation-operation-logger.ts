@@ -1,7 +1,7 @@
 import { aggregationLogger } from '../../logger-winston/winston.config';
 
 export interface AggregationOperationLogContext {
-  tsdId: number;
+  tsdId: string;
   taskId?: number | null;
   operation: string;
   [key: string]: unknown;

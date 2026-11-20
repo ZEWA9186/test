@@ -18,7 +18,7 @@ export class AggregationManualService {
     private readonly gs1Parser: Gs1ParserService,
   ) {}
 
-  async deleteCode(tsdId: number, code: string): Promise<void> {
+  async deleteCode(tsdId: string, code: string): Promise<void> {
     return withOperationLogging({ tsdId, operation: 'deleteCode', code }, async (context) => {
       await this.shared.withTransaction(tsdId, async (manager, activeTask) => {
         context.taskId = activeTask.taskId;
@@ -34,7 +34,7 @@ export class AggregationManualService {
     });
   }
 
-  async deletePackage(tsdId: number, packageLabel: string): Promise<void> {
+  async deletePackage(tsdId: string, packageLabel: string): Promise<void> {
     return withOperationLogging(
       { tsdId, operation: 'deletePackage', packageLabel },
       async (context) => {
@@ -53,7 +53,7 @@ export class AggregationManualService {
     );
   }
 
-  async addProductIntoPackage(packageLabel: string, tsdId: number, code: string): Promise<void> {
+  async addProductIntoPackage(packageLabel: string, tsdId: string, code: string): Promise<void> {
     return withOperationLogging(
       {
         tsdId,
@@ -96,7 +96,7 @@ export class AggregationManualService {
     );
   }
 
-  async moveBox(innerLabel: string, outerLabel: string, tsdId: number): Promise<void> {
+  async moveBox(innerLabel: string, outerLabel: string, tsdId: string): Promise<void> {
     return withOperationLogging(
       { tsdId, operation: 'moveBox', innerLabel, outerLabel },
       async (context) => {

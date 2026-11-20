@@ -10,7 +10,7 @@ export interface ReportRecord {
   smallBoxLabel: string | null;
   bigBoxLabel: string | null;
   palletLabel: string | null;
-  tsdId: number;
+  tsdId: string;
   createdAt: Date;
 }
 

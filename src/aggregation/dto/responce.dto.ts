@@ -46,6 +46,7 @@ export interface TaskPackagingStats {
 export class AggregationPositionDto {
   current!: number;
   limit!: number;
+  shared?: boolean;
 }
 
 export class AggregationResponseDto {

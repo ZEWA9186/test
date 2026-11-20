@@ -23,7 +23,7 @@ export interface PackagingRecord {
   smallBoxLabel: string | null;
   bigBoxLabel: string | null;
   palletLabel: string | null;
-  tsdId: number;
+  tsdId: string;
   createdAt: Date;
 }
 
@@ -66,14 +66,14 @@ export class AggregationRepository {
     return {
       ...row,
       id: Number(row.id),
-      tsdId: Number(row.tsdId),
+      tsdId: String(row.tsdId),
       createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
     };
   }
 
   // ───────────────────────────── получение активной задачи ─────────────────────────────
 
-  async getActiveTask(tsdId: number, manager?: EntityManager): Promise<ActiveTaskEntity> {
+  async getActiveTask(tsdId: string, manager?: EntityManager): Promise<ActiveTaskEntity> {
     const activeTask = await this.getActiveTaskRepository(manager).findOne({
       where: { tsdId },
     });
@@ -85,7 +85,7 @@ export class AggregationRepository {
     return activeTask;
   }
 
-  async getActiveTaskForUpdate(tsdId: number, manager: EntityManager): Promise<ActiveTaskEntity> {
+  async getActiveTaskForUpdate(tsdId: string, manager: EntityManager): Promise<ActiveTaskEntity> {
     const activeTask = await this.getActiveTaskRepository(manager).findOne({
       where: { tsdId },
       lock: { mode: 'pessimistic_write' },
@@ -109,10 +109,10 @@ export class AggregationRepository {
     const lvl = Number(activeTask.aggregationLvl);
 
     if (lvl === 1) {
+      // Уровень 1: паллета общая, товары всех ТСД идут на неё.
       const rows = await em.query(
         `SELECT COUNT(*) FILTER (WHERE pallet_label IS NULL) AS "openProducts"
-       FROM ${table} WHERE tsd_id = $1`,
-        [activeTask.tsdId],
+       FROM ${table}`,
       );
 
       return {
@@ -125,25 +125,27 @@ export class AggregationRepository {
     }
 
     if (lvl === 2) {
-      const rows = await em.query(
-        `SELECT
-         COUNT(*) FILTER (
+      const localRows = await em.query(
+        `SELECT COUNT(*) FILTER (
            WHERE big_box_label IS NULL AND pallet_label IS NULL
-         ) AS "openProducts",
-         COUNT(DISTINCT big_box_label) FILTER (
-           WHERE big_box_label IS NOT NULL AND pallet_label IS NULL
-         ) AS "closedBigBoxes"
+         ) AS "openProducts"
        FROM ${table}
        WHERE tsd_id = $1`,
         [activeTask.tsdId],
       );
+      const sharedRows = await em.query(
+        `SELECT COUNT(DISTINCT big_box_label) FILTER (
+           WHERE big_box_label IS NOT NULL AND pallet_label IS NULL
+         ) AS "closedBigBoxes"
+       FROM ${table}`,
+      );
 
       return {
-        openProducts: Number(rows[0]?.openProducts ?? 0),
+        openProducts: Number(localRows[0]?.openProducts ?? 0),
         closedSmallBoxes: 0,
         fullSmallBoxes: 0,
         partialSmallBoxes: 0,
-        closedBigBoxes: Number(rows[0]?.closedBigBoxes ?? 0),
+        closedBigBoxes: Number(sharedRows[0]?.closedBigBoxes ?? 0),
       };
     }
 
@@ -168,11 +170,15 @@ export class AggregationRepository {
            AND pallet_label IS NULL) AS "openProducts",
        (SELECT COUNT(*) FROM small) AS "closedSmallBoxes",
        (SELECT COUNT(*) FROM small WHERE products = $2) AS "fullSmallBoxes",
-       (SELECT COUNT(*) FROM small WHERE products <> $2) AS "partialSmallBoxes",
-       (SELECT COUNT(DISTINCT big_box_label) FROM base
-         WHERE big_box_label IS NOT NULL
-           AND pallet_label IS NULL) AS "closedBigBoxes"`,
+       (SELECT COUNT(*) FROM small WHERE products <> $2) AS "partialSmallBoxes"`,
       [activeTask.tsdId, activeTask.piecesPerSmallBox],
+    );
+
+    const sharedRows = await em.query(
+      `SELECT COUNT(DISTINCT big_box_label) AS "closedBigBoxes"
+       FROM ${table}
+       WHERE big_box_label IS NOT NULL
+         AND pallet_label IS NULL`,
     );
 
     return {
@@ -180,7 +186,7 @@ export class AggregationRepository {
       closedSmallBoxes: Number(rows[0]?.closedSmallBoxes ?? 0),
       fullSmallBoxes: Number(rows[0]?.fullSmallBoxes ?? 0),
       partialSmallBoxes: Number(rows[0]?.partialSmallBoxes ?? 0),
-      closedBigBoxes: Number(rows[0]?.closedBigBoxes ?? 0),
+      closedBigBoxes: Number(sharedRows[0]?.closedBigBoxes ?? 0),
     };
   }
 
@@ -196,14 +202,15 @@ export class AggregationRepository {
     const em = this.getManager(manager);
 
     const innerColumn = AggregationRules.getColumnByScanType(innerType);
+    const shared = outerType === ExpectedScanType.PALLET_LABEL;
 
     const rows: Array<{ count: string | number }> = await em.query(
       `SELECT COUNT(DISTINCT ${innerColumn}) AS "count"
      FROM ${table}
      WHERE ${outerColumn} = $1
        AND ${innerColumn} IS NOT NULL
-       AND tsd_id = $2`,
-      [label, activeTask.tsdId],
+       ${shared ? '' : 'AND tsd_id = $2'}`,
+      shared ? [label] : [label, activeTask.tsdId],
     );
 
     return Number(rows[0]?.count ?? 0);
@@ -588,18 +595,18 @@ export class AggregationRepository {
     }
 
     const whereSql = whereParts.join(' AND ');
+    const shared = containerType === ExpectedScanType.PALLET_LABEL;
 
-    // 3. Закрываем только строки текущего уровня.
-    //    column и whereSql собраны только из фиксированного списка выше.
+    // 3. Паллета общая для всех ТСД, остальные контейнеры — локальные.
     const updatedRows: Array<{ updated: number }> = await em.query(
       `
       UPDATE ${table}
       SET ${column} = $1
-      WHERE tsd_id = $2
-        AND ${whereSql}
+      WHERE ${whereSql}
+        ${shared ? '' : 'AND tsd_id = $2'}
       RETURNING 1 AS updated
     `,
-      [code, activeTask.tsdId],
+      shared ? [code] : [code, activeTask.tsdId],
     );
 
     if (updatedRows.length === 0) {

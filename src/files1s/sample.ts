@@ -14,7 +14,12 @@ export const TASK: IDefaultTask[] = [
     comment: 'название отображаемое в окне программы для оператора',
     required: true,
   },
-
+  {
+    name: 'id',
+    label: 'Идентификатор задачи работника',
+    comment: 'идентификатор по которому работник ищет задачу',
+    required: true,
+  },
   {
     name: 'description',
     label: 'Описание продукта',

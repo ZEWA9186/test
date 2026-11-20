@@ -48,8 +48,8 @@ export class TaskEntity {
   @Column({ name: 'batch', type: 'varchar', nullable: true })
   batch: string;
 
-  @Column({ name: 'packer', type: 'varchar', nullable: true })
-  packer: string;
+  @Column({ name: 'packer', type: 'text', array: true, nullable: true })
+  packer: string[];
 
   @Column({ name: 'date_manufacture', type: 'varchar', nullable: true })
   dateManufacture: string;
@@ -72,10 +72,7 @@ export class TaskEntity {
   @OneToMany(() => TaskCodesEntity, (code) => code.task, { cascade: true })
   codes: TaskCodesEntity[];
 
-  @Column({ name: 'tsdIds', type: 'int', array: true, nullable: true })
-  tsdIds: number[];
-
-  @Column({ name: 'is_active', type: 'boolean', default: false })
+  @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
@@ -92,6 +89,9 @@ export class TaskEntity {
   @Column({ name: 'is_history', type: 'boolean', default: false })
   isHistory: boolean;
 
-  @PrimaryGeneratedColumn('increment', { name: 'id' })
+  @PrimaryGeneratedColumn('uuid', { name: 'external_id' })
+  externalId: string;
+
+  @Column({ name: 'id', type: 'int' })
   id: number;
 }

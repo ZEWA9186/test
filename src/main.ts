@@ -11,6 +11,8 @@ dotenv.config({ path: envPath });
 import { NestFactory } from '@nestjs/core';
 import { json, urlencoded } from 'express';
 import { ConfigValidationService } from './config/config-validation.service';
+import { migrateTsdIdColumns } from './database/tsd-id-migration';
+import { migrateTaskExternalIds } from './database/task-external-id-migration';
 
 async function bootstrap() {
   const configValidation = new ConfigValidationService();
@@ -23,6 +25,8 @@ async function bootstrap() {
   }
 
   await configValidation.initDirectories();
+  await migrateTsdIdColumns();
+  await migrateTaskExternalIds();
   const { AppModule } = await import('./app.module');
 
   const app = await NestFactory.create(AppModule);

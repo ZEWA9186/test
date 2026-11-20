@@ -10,6 +10,7 @@ import { AggregationSharedService } from './aggregation-shared.service';
 import { Gs1ParserService } from '../../validation/gs1-parser.service';
 import { withOperationLogging } from '../helper-service/aggregation-operation-logger';
 import { TaskCodesEntity } from '../../task/entities/task-codes.entity';
+import { TaskEntity } from '../../task/entities/task.entity';
 
 @Injectable()
 export class AggregationReportService {
@@ -19,7 +20,7 @@ export class AggregationReportService {
     private readonly gs1Parser: Gs1ParserService,
   ) {}
 
-  async searchInfo(tsdId: number, code: string): Promise<AggregationInfoDto> {
+  async searchInfo(tsdId: string, code: string): Promise<AggregationInfoDto> {
     return withOperationLogging({ tsdId, operation: 'searchInfo', code }, async (context) => {
       return this.shared.withReadTransaction(tsdId, async (manager, activeTask) => {
         context.taskId = activeTask.taskId;
@@ -42,7 +43,7 @@ export class AggregationReportService {
     });
   }
 
-  async validateTaskCompletion(tsdId: number) {
+  async validateTaskCompletion(tsdId: string) {
     return withOperationLogging({ tsdId, operation: 'validateTaskCompletion' }, async (context) => {
       return this.shared.withReadTransaction(tsdId, async (manager, activeTask) => {
         context.taskId = activeTask.taskId;
@@ -68,8 +69,17 @@ export class AggregationReportService {
           throw new InternalServerErrorException();
         }
 
+        const task = await manager.getRepository(TaskEntity).findOne({
+          where: { id: activeTask.taskId },
+          select: ['externalId'],
+        });
+
+        if (!task) {
+          throw new InternalServerErrorException();
+        }
+
         const taskCodesCount = await manager.getRepository(TaskCodesEntity).count({
-          where: { taskId: activeTask.taskId },
+          where: { externalId: task.externalId },
         });
 
         if (stats.totalRecords !== taskCodesCount) {
